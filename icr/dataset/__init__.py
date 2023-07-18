@@ -12,6 +12,8 @@ class ICRDataset(Dataset):
         1. Preprocessing
             - missing value
             - categorical encoding
+        1. Dataloader 
+            - **undersampling**
 
     """
 
@@ -19,11 +21,10 @@ class ICRDataset(Dataset):
     def __init__(
         self,
         split: Literal['train', 'test', 'infer'],
-        batch_size: int,
-        num_workers: int,
-        ...,
+        *_,
         **kwargs,
     ):
+        self.split = split
         return
 
     @property
@@ -34,7 +35,9 @@ class ICRDataset(Dataset):
             DataLoader: _description_
         """
         pass
-        return DataLoader(self, )
+
+    def load(self):
+        pass
 
     def __getitem__(self, index):
         """_summary_
@@ -43,3 +46,4 @@ class ICRDataset(Dataset):
             index (_type_): _description_
         """
         pass
+    
