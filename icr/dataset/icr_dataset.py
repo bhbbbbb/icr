@@ -1,6 +1,6 @@
+from __future__ import annotations
 from typing import Literal
 from torch.utils.data import Dataset, DataLoader
-
 
 class ICRDataset(Dataset):
     """ICR Dataset
@@ -20,11 +20,12 @@ class ICRDataset(Dataset):
 
     def __init__(
         self,
-        split: Literal['train', 'test', 'infer'],
+        mode: Literal['train', 'test', 'infer'],
         *_,
         **kwargs,
     ):
-        self.split = split
+        assert mode in ['train', 'test', 'infer']
+        self.mode = mode
         return
 
     @property
@@ -36,15 +37,40 @@ class ICRDataset(Dataset):
         """
         pass
 
+    def make_subset(self) -> ICRDataset:
+        """Get Subset. Define a way to split the dataset with the given indices.
+
+        This method is used by k-fold cross validation.
+        
+        Args:
+            indicies (slice): _description_
+
+        Returns:
+            ICRDataset: _description_
+        """
+        pass
+
+
+    def __len__(self):...
+
+
     def __getitem__(self, index):
-        """_summary_
+        """
 
         Args:
-            index (_type_): _description_
+            index (int, list): 
+        
+        Returns:
+            Tuple[features, labels]
+            if index is list:
+                features(float): (batch_size, n_features)
+                labels(int): (batch_size, )
+            if index is int:
+                features(float): (n_features, )
+                labels(int): 
         """
         features = ...
-        label = ...
-        # TODO
+        labels = ...
 
-        return 
+        return features, labels
     

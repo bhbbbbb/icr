@@ -4,6 +4,7 @@ import os
 from sklearn.model_selection import KFold
 
 from model_utils import formatted_now
+from model_utils.base_model_utils import get_logger
 
 from icr.dataset.foo_dataset import ICRDataset as ICRDataset
 from icr.models import ICRModel
@@ -52,6 +53,8 @@ def cross_validation(config: ICRModelUtilsConfig, k: int):
     cv_loss /= k
 
     print(f'cv_loss = {cv_loss:.6f}')
+    with open(os.path.join(cv_log_dir, 'cv_loss.txt'), 'w', encoding='utf8') as fout:
+        fout.write(f'{cv_loss}')
     return
 
 

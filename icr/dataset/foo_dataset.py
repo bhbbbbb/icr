@@ -88,7 +88,7 @@ class ICRDataset(Dataset):
 
         return DataLoader(
             self,
-            batch_size=16,
+            batch_size=32,
             shuffle=True,
             num_workers=0,
             drop_last=False,
