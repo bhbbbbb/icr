@@ -94,6 +94,7 @@ disable=raw-checker-failed,
         # ------------------------ add on ------------------------  
         useless-return,
         missing-module-docstring,
+        trailing-whitespace,
 
 
 # Enable the message, report, category or checker with the given id(s). You can
@@ -223,7 +224,7 @@ good-names=i,
 
 # Good variable names regexes, separated by a comma. If names match any regex,
 # they will always be accepted
-good-names-rgxs=
+good-names-rgxs=^[_a-z][_a-z0-9]?$,[A-Z_][A-Z0-9_]*$ #|(__.*__))$
 
 # Include a hint for the correct naming format with invalid-name.
 include-naming-hint=no
