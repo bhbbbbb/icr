@@ -1,4 +1,2 @@
-from torch import nn
-
-class ICRModel(nn.Module):
-    pass
+from .foo_model import ICRModel
+# from .icr_model import ICRModel
