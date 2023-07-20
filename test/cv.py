@@ -3,6 +3,8 @@ import os
 
 from sklearn.model_selection import KFold
 
+from model_utils import formatted_now
+
 from icr.dataset.foo_dataset import ICRDataset as ICRDataset
 from icr.models import ICRModel
 from icr.model_utils import ICRModelUtils
@@ -20,6 +22,7 @@ def train(config):
 def cross_validation(config: ICRModelUtilsConfig, k: int):
     train_set = ICRDataset('train')
 
+    cv_log_dir = f'log/cv-{formatted_now()}'
     cv_loss = 0.
 
     spliter = KFold(n_splits=k, shuffle=True)
@@ -31,6 +34,7 @@ def cross_validation(config: ICRModelUtilsConfig, k: int):
         train_loader = train_set.make_subset(train_indices, 'train').dataloader
         valid_loader = train_set.make_subset(valid_indices, 'test').dataloader
         config.steps_per_epoch = len(train_loader)
+        config.log_dir = os.path.join(cv_log_dir, f'fold-{fold}')
         config.check_and_freeze(freeze=False)
         config.display()
 
@@ -57,7 +61,14 @@ def main():
     config.loss_class_weights = [1, 2]
     config.save_best = True
     config.epochs_per_checkpoint = 0
+
     cross_validation(config, 5)
+
+    ##
+    # config.steps_per_epoch = 10##
+    # config.check_and_freeze()
+    # model = ICRModel(config)
+    # model_utils = ICRModelUtils.load_last_checkpoint(model, config)
     return
 
 if __name__ == '__main__':
