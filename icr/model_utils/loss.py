@@ -9,7 +9,7 @@ class BlancedLogLoss(nn.Module):
     """BlancedLogLoss"""
 
     class_weights: Tensor
-    def __init__(self, class_weights: Tuple[float, float], device):
+    def __init__(self, class_weights: Tuple[float, float], device = None):
         super().__init__()
 
         self.device = device

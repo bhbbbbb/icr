@@ -35,7 +35,7 @@ class ICRDataset(Dataset):
         Returns:
             DataLoader: _description_
         """
-        pass
+        return DataLoader()
 
     def make_subset(self) -> ICRDataset:
         """Get Subset. Define a way to split the dataset with the given indices.
@@ -54,7 +54,7 @@ class ICRDataset(Dataset):
     def __len__(self):...
 
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int):
         """
 
         Args:
@@ -69,8 +69,9 @@ class ICRDataset(Dataset):
                 features(float): (n_features, )
                 labels(int): 
         """
-        features = ...
-        labels = ...
+        assert isinstance(index, int)
+        features = ... # 56-dim
+        label = ... # int
 
-        return features, labels
+        return features, label
     
