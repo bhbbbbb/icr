@@ -5,7 +5,7 @@ from icr.dataset import ICRDataset
 
 
 def general():
-    train_set = ICRDataset('train')
+    train_set = ICRDataset('train') # <<<<<<<<<<<<
 
     print('------------- general test -----------------')
 
@@ -33,7 +33,7 @@ def general():
 
 def subset():
 
-    train_set = ICRDataset('train')
+    train_set = ICRDataset('train') # <<<<<<<<<<<<<
 
     length = len(train_set)
     train_subset_indices = list(range(int(length * .8)))

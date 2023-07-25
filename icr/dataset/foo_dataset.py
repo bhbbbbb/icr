@@ -27,11 +27,20 @@ class ICRDataset(Dataset):
         self,
         mode: Literal['train', 'test', 'infer'],
     ):
+        """_summary_
+
+        Args:
+            mode (Literal[&#39;train&#39;, &#39;test&#39;, &#39;infer&#39;]): 
+            'train: train.csv
+            'test: train.csv #valid
+            'infer: test.csv
+        """
         self.mode = mode
         self.df = pd.DataFrame(np.zeros((617, 57)))
         self.x = self.df[range(56)]
         self.y = self.df[56].astype(int)
         return
+
 
     def __len__(self):
         return len(self.df)
@@ -56,7 +65,7 @@ class ICRDataset(Dataset):
         return features.to_numpy(), labels
 
 
-    def make_subset(self, indices: slice, mode: Literal['train', 'test', 'infer']) -> ICRDataset:
+    def make_subset(self, indices: list, mode: Literal['train', 'test', 'infer']) -> ICRDataset:
         """Get Subset. Define a way to split the dataset with the given indices.
 
         This method is used by k-fold cross validation.
@@ -83,7 +92,7 @@ class ICRDataset(Dataset):
         
         # num_samples = (self.y == 1).sum() + (self.y == 0).sum() * 1 / class1_weight
 
-        # num_samples: set to make each (label == 1) be sampled once in expectation
+        # # num_samples: set to make each (label == 1) be sampled once in expectation
         # sampler = WeightedRandomSampler(weights, num_samples=num_samples, replacement=True)
 
         return DataLoader(

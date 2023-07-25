@@ -117,7 +117,7 @@ class ICRDataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int):
         """
 
         Args:

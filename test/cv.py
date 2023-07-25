@@ -1,15 +1,22 @@
 #pylint: disable=all
 import os
+import typing
 
 from sklearn.model_selection import KFold
 
 from model_utils import formatted_now
-from model_utils.base_model_utils import get_logger
 
 from icr.dataset.foo_dataset import ICRDataset as ICRDataset
 from icr.models import ICRModel
 from icr.model_utils import ICRModelUtils
 from icr.model_utils.config import ICRModelUtilsConfig
+
+
+class Config(ICRModelUtilsConfig):
+    epochs: int = 3
+    loss_class_weights: typing.Tuple[float, float] = [1., 1.]
+    save_best: bool = True
+    epochs_per_checkpoint: int = 0
 
 def train(config):
 
@@ -20,7 +27,7 @@ def train(config):
     # model_utils = ICRModelUtils.start_new_training(model, config)
     return
 
-def cross_validation(config: ICRModelUtilsConfig, k: int):
+def cross_validation(k: int):
     train_set = ICRDataset('train')
 
     cv_log_dir = f'log/cv-{formatted_now()}'
@@ -32,23 +39,23 @@ def cross_validation(config: ICRModelUtilsConfig, k: int):
         
         print(f'\n --------------- Fold: {fold} ------------------')
         # input('continue...')
+        # train_set = train_set.make_subset(train_indices, 'train')
+        # train_loader = train_set.dataloader
         train_loader = train_set.make_subset(train_indices, 'train').dataloader
         valid_loader = train_set.make_subset(valid_indices, 'test').dataloader
-        config.steps_per_epoch = len(train_loader)
-        config.log_dir = os.path.join(cv_log_dir, f'fold-{fold}')
-        config.check_and_freeze(freeze=False)
+        config = Config(
+            steps_per_epoch = len(train_loader),
+            log_dir = os.path.join(cv_log_dir, f'fold-{fold}'),
+        )
         config.display()
 
         model = ICRModel(config)
-        model_utils = ICRModelUtils.start_new_training(model, config)
+        model_utils: ICRModelUtils = ICRModelUtils.start_new_training(model, config)
 
         history = model_utils.train(config.epochs, train_loader, valid_loader)
 
-        def selector(s):
-            return s['valid_criteria']['loss']
-        valid_losses = map(selector, history.history)
-        best_valid_loss = min(valid_losses)
-        cv_loss += best_valid_loss
+        best_valid_loss = history.get_best_criterion()
+        cv_loss += best_valid_loss.value
     
     cv_loss /= k
 
@@ -59,19 +66,14 @@ def cross_validation(config: ICRModelUtilsConfig, k: int):
 
 
 def main():
-    config = ICRModelUtilsConfig()
-    config.epochs = 3
-    config.loss_class_weights = [1, 2]
-    config.save_best = True
-    config.epochs_per_checkpoint = 0
 
-    cross_validation(config, 5)
+    # cross_validation(5)
 
-    ##
-    # config.steps_per_epoch = 10##
-    # config.check_and_freeze()
-    # model = ICRModel(config)
-    # model_utils = ICRModelUtils.load_last_checkpoint(model, config)
+    model = ICRModel('')
+    dir_path = 'log/cv-20230723T17-16-27/fold-4/20230723T17-16-30'
+    utils = ICRModelUtils.load_last_checkpoint(model, dir_path)
+    config = utils.config
+    config.display()
     return
 
 if __name__ == '__main__':
