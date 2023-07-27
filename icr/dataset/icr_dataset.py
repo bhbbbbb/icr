@@ -1,8 +1,9 @@
 from __future__ import annotations
 # import os
-from typing import Literal, get_args, Tuple, ClassVar, Dict
+from typing import Literal, get_args, Tuple, ClassVar, Dict, Sequence, Union, overload
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 import pandas as pd
+import numpy as np
 # from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from model_utils.config import BaseConfig
@@ -170,7 +171,25 @@ class ICRDataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, index: int):
+    
+    @overload
+    def __getitem__(self, index: int) -> Tuple[np.ndarray, int]:
+        """When mode != 'infer'"""
+
+    @overload
+    def __getitem__(self, index: int) -> np.ndarray:
+        """When mode == 'infer'"""
+
+    @overload
+    def __getitem__(self, indices: Sequence[int]) -> Tuple[np.ndarray, np.ndarray]:
+        """When mode != 'infer'"""
+
+    @overload
+    def __getitem__(self, indices: Sequence[int]) -> np.ndarray:
+        """When mode == 'infer'"""
+
+
+    def __getitem__(self, index: Union[int, Sequence[int]]):
         """
 
         Args:
@@ -182,10 +201,12 @@ class ICRDataset(Dataset):
                 features(float): (n_features, )
                 labels(int): 
         """
+        index = [index] if isinstance(index, int) else index
         row = self.df.iloc[index]
         if self.mode == 'infer':
             return row.to_numpy()
 
-        features = row.drop('Class')
+        features = row.drop('Class', axis=1)
         label = row['Class']
-        return features.to_numpy(), int(label)
+
+        return features.to_numpy().squeeze(), label.to_numpy().squeeze()

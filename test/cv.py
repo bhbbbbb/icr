@@ -3,7 +3,8 @@ import os
 import warnings
 import typing
 
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, StratifiedKFold
+import numpy as np
 
 from model_utils import formatted_now
 from pydantic import model_validator
@@ -42,21 +43,21 @@ class Config(ICRModelUtilsConfig, ICRDNNConfig, ICRDatasetConfig):
         return self
 
 
-def cross_validation(k: int, config: Config):
+def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
 
     train_set = ICRDataset('train', config)
 
     cv_log_dir = f'log/cv-{formatted_now()}'
     cv_loss = 0.
 
-    spliter = KFold(n_splits=k, shuffle=True)
-    
-    for fold, (train_indices, valid_indices) in enumerate(spliter.split(train_set.df)):
+    spliter = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
+
+    for fold, (train_indices, valid_indices) in enumerate(spliter.split(*(train_set[:]))):
         
+
+        train_indices: typing.List[int]
+        train_indices: typing.List[int]
         print(f'\n --------------- Fold: {fold} ------------------')
-        # input('continue...')
-        # train_set = train_set.make_subset(train_indices, 'train')
-        # train_loader = train_set.dataloader
         train_loader = train_set.make_subset(train_indices, 'train').dataloader
         valid_loader = train_set.make_subset(valid_indices, 'test').dataloader
         config = Config(
