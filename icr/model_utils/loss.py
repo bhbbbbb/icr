@@ -31,7 +31,7 @@ class BlancedLogLoss(nn.Module):
 
         assert nc.detach().sum() == len(y_true)
 
-        weights = (1 / nc).mul(self.class_weights)
+        weights = (.5 / nc).mul(self.class_weights)
         sample_weights = weights[y_true]
 
         y_pred = y_pred.to(torch.float64).clip(1e-15, 1 - 1e-15)

@@ -1,18 +1,21 @@
 # pylint: disable=all
+import sys
 from torch import Tensor
 from tqdm import tqdm
-from icr.dataset import ICRDataset
+from icr.dataset import ICRDataset, ICRDatasetConfig
 
 
-def general():
-    train_set = ICRDataset('train') # <<<<<<<<<<<<
+def general(config):
+    train_set = ICRDataset('train', config)
 
     print('------------- general test -----------------')
 
     step = 0
     features_cache: Tensor = None
     labels_cache: Tensor = None
-    for features, labels in tqdm(train_set.dataloader):
+    dataloader = train_set.dataloader
+
+    for features, labels in tqdm(dataloader):
         
         if step == 0:
             features_cache = features
@@ -28,18 +31,17 @@ def general():
     assert features_cache.is_floating_point()
     assert not labels_cache.is_floating_point()
     print('-----------------------------')
-
     return
 
-def subset():
+def subset(config):
 
-    train_set = ICRDataset('train') # <<<<<<<<<<<<<
+    train_set = ICRDataset('train', config) # <<<<<<<<<<<<<
 
     length = len(train_set)
     train_subset_indices = list(range(int(length * .8)))
     train_subset = train_set.make_subset(train_subset_indices, 'train')
-    valid_subset_indices = list(range(length - len(train_subset_indices)))
-    valid_subset = train_set.make_subset(valid_subset_indices, 'test')
+    valid_subset_indices = list(range(int(length * .8), length))
+    valid_subset = train_set.make_subset(valid_subset_indices, 'valid')
 
     print('train_subset:')
     step = 0
@@ -60,20 +62,29 @@ def subset():
     step = 0
     features_cache = None
     labels_cache = None
-    for features, labels in tqdm(valid_subset.dataloader):
+    for features in tqdm(valid_subset.dataloader):
         
         if step == 0:
-            features_cache = features
             labels_cache = labels
         
         step += 1
-    print(f'features: {features_cache.shape}, {features_cache.dtype}')
     print(f'features: {labels_cache.shape}, {labels_cache.dtype}')
     return
 
 def main():
-    general()
-    subset()
+    
+    import os
+    dataset_dir = os.path.realpath('icr-identify-age-related-conditions')
+    sys.path.append(dataset_dir)
+    config = ICRDatasetConfig(
+        train_csv_path=os.path.join(dataset_dir, 'train.csv'),
+        test_csv_path=os.path.join(dataset_dir, 'test.csv'),
+        batch_size_train=64,
+        batch_size_eval=128,
+        num_workers=0,
+    )
+    general(config)
+    subset(config)
     
 
 if __name__ == '__main__':

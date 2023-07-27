@@ -5,11 +5,14 @@ from model_utils.config import BaseConfig
 
 class ICRModelConfig(BaseConfig):
 
-    num_features: int
-    num_targets: int
+    num_features: int = 56
+    num_targets: int = 1
 
-    channel_base_dim: int = 128
-    hidden_size: int = 2048
+    # channel_base_dim: int = 128
+    # hidden_size: int = 2048
+    channel_base_dim: int = 64
+    hidden_size: int = 1024
+    dropout: float = .3
 
     @field_validator('channel_base_dim', 'hidden_size')
     @classmethod
@@ -47,25 +50,25 @@ class ICRModel(nn.Module):
         self.cha_po_2 = cha_po_2
 
         self.batch_norm1 = nn.BatchNorm1d(config.num_features)
-        self.dropout1 = nn.Dropout(0.1)
+        self.dropout1 = nn.Dropout(config.dropout)
         self.dense1 = nn.utils.weight_norm(nn.Linear(config.num_features, config.hidden_size))
 
         self.batch_norm_c1 = nn.BatchNorm1d(cha_1)
-        self.dropout_c1 = nn.Dropout(0.1)
+        self.dropout_c1 = nn.Dropout(config.dropout)
         self.conv1 = nn.utils.weight_norm(nn.Conv1d(cha_1,cha_2, kernel_size = 5, stride = 1, padding=2,  bias=False),dim=None)
 
         self.ave_po_c1 = nn.AdaptiveAvgPool1d(output_size = cha_po_1)
 
         self.batch_norm_c2 = nn.BatchNorm1d(cha_2)
-        self.dropout_c2 = nn.Dropout(0.1)
+        self.dropout_c2 = nn.Dropout(config.dropout)
         self.conv2 = nn.utils.weight_norm(nn.Conv1d(cha_2,cha_2, kernel_size = 3, stride = 1, padding=1, bias=True),dim=None)
 
         self.batch_norm_c2_1 = nn.BatchNorm1d(cha_2)
-        self.dropout_c2_1 = nn.Dropout(0.3)
+        self.dropout_c2_1 = nn.Dropout(config.dropout + .2)
         self.conv2_1 = nn.utils.weight_norm(nn.Conv1d(cha_2,cha_2, kernel_size = 3, stride = 1, padding=1, bias=True),dim=None)
 
         self.batch_norm_c2_2 = nn.BatchNorm1d(cha_2)
-        self.dropout_c2_2 = nn.Dropout(0.2)
+        self.dropout_c2_2 = nn.Dropout(config.dropout + .1)
         self.conv2_2 = nn.utils.weight_norm(nn.Conv1d(cha_2,cha_3, kernel_size = 5, stride = 1, padding=2, bias=True),dim=None)
 
         self.max_po_c2 = nn.MaxPool1d(kernel_size=4, stride=2, padding=1)
@@ -73,7 +76,7 @@ class ICRModel(nn.Module):
         self.flt = nn.Flatten()
 
         self.batch_norm3 = nn.BatchNorm1d(cha_po_2)
-        self.dropout3 = nn.Dropout(0.2)
+        self.dropout3 = nn.Dropout(config.dropout + .1)
         self.dense3 = nn.utils.weight_norm(nn.Linear(cha_po_2, config.num_targets))
 
     def forward(self, x):

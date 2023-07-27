@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 from model_utils import ModelUtilsConfig
 
 from ..tools import is_on_kaggle
@@ -11,7 +11,7 @@ class ICRModelUtilsConfig(ModelUtilsConfig):
 
     weight_decay: float = 0.0001
 
-    epochs_per_checkpoint: int
+    epochs_per_checkpoint: int = 0
     """num of epochs per checkpoints
 
         Examples:
@@ -36,12 +36,12 @@ class ICRModelUtilsConfig(ModelUtilsConfig):
     early_stopping_threshold: int = 10
     """Threshold for early stopping mode. Only matter when EARLY_STOPPING is set to True."""
 
-    save_best: bool
+    save_best: bool = False
     """set True to save every time when the model reach best valid score."""
 
     progress_bar: bool = True
 
-    loss_class_weights: Tuple[float, float]
+    loss_class_weights: Tuple[float, float] = (1, 1)
 
 
 
@@ -52,4 +52,4 @@ class ICRModelUtilsConfig(ModelUtilsConfig):
     pct_start: float = 0.1
     div_factor: float = 1e5
     epochs: int
-    steps_per_epoch: int
+    steps_per_epoch: Optional[int] = None
