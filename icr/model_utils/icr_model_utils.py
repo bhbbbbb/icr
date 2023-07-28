@@ -10,7 +10,7 @@ from tqdm import tqdm
 from model_utils import BaseModelUtils
 from model_utils.criteria import Loss, Criteria, Accuarcy
 
-from .config import ICRModelUtilsConfig
+from .icr_model_utils_config import ICRModelUtilsConfig
 from .loss import BlancedLogLoss
 # from ..dataset import ICRDataset
 
@@ -32,10 +32,13 @@ Precision = Criteria.register_criterion(
 class ICRModelUtils(BaseModelUtils[DataLoader, DataLoader]):
 
     config: ICRModelUtilsConfig
-    loss_fn: BlancedLogLoss
+    train_loss_fn: BlancedLogLoss
+    eval_loss_fn: BlancedLogLoss
 
     def _init(self):
-        self.loss_fn = BlancedLogLoss(self.config.loss_class_weights, self.config.device)
+        self.train_loss_fn = BlancedLogLoss(
+            self.config.loss_class_weights, self.config.device)
+        self.eval_loss_fn = BlancedLogLoss([1., 1.], self.config.device)
         return
 
     @staticmethod
@@ -81,7 +84,7 @@ class ICRModelUtils(BaseModelUtils[DataLoader, DataLoader]):
 
             predictions: Tensor = self.model(features)
             predictions = torch.sigmoid(predictions)
-            loss: Tensor = self.loss_fn.forward(labels, predictions.squeeze(1))
+            loss: Tensor = self.train_loss_fn.forward(labels, predictions.squeeze(1))
 
             loss.backward()
             self.optimizer.step()
@@ -135,7 +138,7 @@ class ICRModelUtils(BaseModelUtils[DataLoader, DataLoader]):
 
             predictions: Tensor = self.model(features)
             predictions = torch.sigmoid(predictions).squeeze(1)
-            loss: Tensor = self.loss_fn.forward(labels, predictions)
+            loss: Tensor = self.eval_loss_fn.forward(labels, predictions)
 
             running_loss = loss.item()
             eval_loss += running_loss
@@ -155,6 +158,6 @@ class ICRModelUtils(BaseModelUtils[DataLoader, DataLoader]):
         return (
             Loss(eval_loss),
             Accuarcy(n_correct / n_samples),
-            Precision(tp / (tp + fp)),
-            Recall(tp / (tp + fn)),
+            Precision(tp / (tp + fp + 1e-10)),
+            Recall(tp / (tp + fn + 1e-10)),
         )

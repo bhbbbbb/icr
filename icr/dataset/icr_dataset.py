@@ -1,34 +1,20 @@
 from __future__ import annotations
 # import os
-from typing import Literal, get_args, Tuple, ClassVar, Dict, Sequence, Union, overload
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
+from typing import (
+    Literal, get_args, Tuple, ClassVar, Dict, Sequence, Union, overload
+)
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler, Dataset
 import pandas as pd
 import numpy as np
 # from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from model_utils.config import BaseConfig
+from imblearn.over_sampling import SMOTENC
+
+from .icr_dataset_config import ICRDatasetConfig
 
 ModeT = Literal['train', 'valid', 'infer']
-class ICRDatasetConfig(BaseConfig):
-
-    batch_size_train: int
-    batch_size_eval: int
-
-    train_csv_path: str = 'train.csv'
-    test_csv_path: str = 'test.csv'
-    persistent_workers: bool = False
-    pin_memory: bool =True
-    num_workers: int
-
-    class_sample_weights: Tuple[float, float] = (1, 1)
-    """weights for sampling each case
-
-    E.g. (1., 1.) indicates the sampler would sample half class0 and half class1
-    """
-
-    n_train_samples_per_epoch: int = 1024
-    """# of train samples per epoch"""
-
+CAT_COL = 'EJ'
+CLASS_COL = 'Class'
 
 class ICRDataset(Dataset):
     """ICR Dataset
@@ -57,11 +43,19 @@ class ICRDataset(Dataset):
         self.mode = mode
         
         path = config.train_csv_path if mode == 'train' else config.test_csv_path
-        self.df = ICRDataset._load_df(path)
+        self.df = ICRDataset._load_df(path, config.standard_scale_enable)
+        self.smote = (
+            SMOTENC(
+                [self.df.columns.get_loc(CAT_COL)],
+                sampling_strategy=config.smote_strategy
+            )
+            if config.smote_strategy is not None else
+            None
+        )
         return
 
     @classmethod
-    def _load_df(cls, path: str):
+    def _load_df(cls, path: str, standard_scale_enable: bool):
 
         # def _train_test_split(df: pd.DataFrame, cache_dir: str):
         #     """load split indices if split.csv in cache_dir. Else
@@ -87,7 +81,7 @@ class ICRDataset(Dataset):
         #         random_state=104,
         #         test_size=0.15,
         #         shuffle=True,
-        #         stratify=df['Class'],
+        #         stratify=df[CLASS_COL],
         #     )
         #     train_df: pd.DataFrame
         #     valid_df: pd.DataFrame
@@ -102,13 +96,30 @@ class ICRDataset(Dataset):
         df = pd.read_csv(path)
         df.drop(columns=['Id'], inplace=True)
         df.fillna(df.mean(), inplace=True)
-        df['EJ'] = df['EJ'].map({'A': 0, 'B': 1})
-        scaler = StandardScaler()
-        df.iloc[:, df.columns != 'Class'] = scaler.fit_transform(
-            df.iloc[:, df.columns != 'Class'])
+        df[CAT_COL] = df[CAT_COL].map({'A': 0, 'B': 1})
         
-        cls._df_cache[path] = df
+        if standard_scale_enable:
+            scaler = StandardScaler()
+            df.iloc[:, df.columns != CLASS_COL] = scaler.fit_transform(
+                df.iloc[:, df.columns != CLASS_COL])
+            
+            cls._df_cache[path] = df
         return df
+
+    @classmethod
+    def _get_under_sampler(
+        cls,
+        labels: pd.Series,
+        config: ICRDatasetConfig.UnderSamplingConfig
+    ):
+        # labels = self.df[CLASS_COL]
+        class_weights = config.class_sample_weights / labels.value_counts()
+        sample_weights: pd.Series = labels.map(class_weights)
+        return WeightedRandomSampler(
+            sample_weights.to_numpy(),
+            config.n_train_samples_per_epoch,
+            replacement=True
+        )
 
     @property
     def dataloader(self) -> DataLoader:
@@ -133,24 +144,34 @@ class ICRDataset(Dataset):
                             pin_memory=self.config.pin_memory,
                             drop_last=False)
 
-        labels = self.df['Class']
-        class_weights = self.config.class_sample_weights / labels.value_counts()
-        sample_weights: pd.Series = labels.map(class_weights)
-        sampler = WeightedRandomSampler(
-            sample_weights.to_numpy(),
-            self.config.n_train_samples_per_epoch,
-            replacement=True
-        )
+        # mode == 'train'
+        if self.config.under_sampling_config is not None:
+            labels = self.df[CLASS_COL]
+            sampler = self._get_under_sampler(labels, self.config.under_sampling_config)
 
-        return DataLoader(self,
+            return DataLoader(self,
+                                batch_size=batch_size,
+                                num_workers=self.config.num_workers,
+                                persistent_workers=self.config.persistent_workers,
+                                pin_memory=self.config.pin_memory,
+                                drop_last=True,
+                                sampler=sampler)
+
+
+        return DataLoader(self.new_smote_dataset(),
                             batch_size=batch_size,
                             num_workers=self.config.num_workers,
                             persistent_workers=self.config.persistent_workers,
                             pin_memory=self.config.pin_memory,
                             drop_last=True,
-                            sampler=sampler)
+                            shuffle=True)
 
-
+    def new_smote_dataset(self) -> SmoteDataset:
+        assert self.mode == 'train'
+        assert self.config.smote_strategy and self.smote is not None
+        x, y = self.smote.fit_resample(*(self[:]))
+        return SmoteDataset(x, y)
+    
     def make_subset(self, indices: list, mode: ModeT) -> ICRDataset:
         """Get Subset. Define a way to split the dataset with the given indices.
 
@@ -163,6 +184,7 @@ class ICRDataset(Dataset):
             ICRDataset: _description_
         """
         assert self.mode == 'train'
+        assert mode in get_args(ModeT)
         subset = ICRDataset('train', self.config)
         subset.mode = mode
         subset.df = subset.df.iloc[indices]
@@ -181,11 +203,11 @@ class ICRDataset(Dataset):
         """When mode == 'infer'"""
 
     @overload
-    def __getitem__(self, indices: Sequence[int]) -> Tuple[np.ndarray, np.ndarray]:
+    def __getitem__(self, indices: Union[Sequence[int], slice]) -> Tuple[np.ndarray, np.ndarray]:
         """When mode != 'infer'"""
 
     @overload
-    def __getitem__(self, indices: Sequence[int]) -> np.ndarray:
+    def __getitem__(self, indices: Union[Sequence[int], slice]) -> np.ndarray:
         """When mode == 'infer'"""
 
 
@@ -206,7 +228,21 @@ class ICRDataset(Dataset):
         if self.mode == 'infer':
             return row.to_numpy()
 
-        features = row.drop('Class', axis=1)
-        label = row['Class']
+        features = row.drop(CLASS_COL, axis=1)
+        label = row[CLASS_COL]
 
         return features.to_numpy().squeeze(), label.to_numpy().squeeze()
+
+class SmoteDataset(Dataset):
+    """Simple wrapper dataset for SMOTE (since smote regenerate date every time)"""
+
+    def __init__(self, x: np.ndarray, y: np.ndarray):
+        self.x = x
+        self.y = y
+        return
+    
+    def __len__(self):
+        return len(self.x)
+
+    def __getitem__(self, index):
+        return self.x[index], self.y[index]

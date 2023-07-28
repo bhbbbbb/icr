@@ -29,14 +29,9 @@ class ICRModelUtilsConfig(ModelUtilsConfig):
     epochs_per_eval: int = 1
     """Number of epochs per evalution"""
 
-    # ----------- Early Stoping Config -----------------------
-    early_stopping: bool = True
-    """whether enable early stopping"""
+    early_stopping_rounds: int = 10
 
-    early_stopping_threshold: int = 10
-    """Threshold for early stopping mode. Only matter when EARLY_STOPPING is set to True."""
-
-    save_best: bool = False
+    save_n_best: int = 0
     """set True to save every time when the model reach best valid score."""
 
     progress_bar: bool = True

@@ -3,7 +3,7 @@ from torch.nn import functional as F
 from pydantic import field_validator
 from model_utils.config import BaseConfig
 
-class ICRModelConfig(BaseConfig):
+class CNNModelConfig(BaseConfig):
 
     num_features: int = 56
     num_targets: int = 1
@@ -22,14 +22,14 @@ class ICRModelConfig(BaseConfig):
             return v
         raise ValueError(f'value {v} is not power of 2')
 
-class ICRModel(nn.Module):
+class CNNModel(nn.Module):
     """ICR model
 
     Credit: baosenguo @ github
         - https://github.com/baosenguo/Kaggle-MoA-2nd-Place-Solution/blob/main/training/1d-cnn-train.ipynb
     """
 
-    def __init__(self, config: ICRModelConfig):
+    def __init__(self, config: CNNModelConfig):
         super().__init__()
         # cha_1 = 256
         # cha_2 = 512

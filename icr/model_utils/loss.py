@@ -29,7 +29,7 @@ class BlancedLogLoss(nn.Module):
         assert not y_true.is_floating_point(), f'y_true.dtype = {y_true.dtype}'
         nc = Tensor([(y_true == 0).sum(), (y_true == 1).sum()]).to(self.device)
 
-        assert nc.detach().sum() == len(y_true)
+        # assert nc.detach().sum() == len(y_true)
 
         weights = (.5 / nc).mul(self.class_weights)
         sample_weights = weights[y_true]
