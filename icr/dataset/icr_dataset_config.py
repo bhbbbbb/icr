@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Literal, Union
 
 from model_utils.config import BaseConfig
 from pydantic import model_validator
@@ -10,6 +10,7 @@ class ICRDatasetConfig(BaseConfig):
 
     train_csv_path: str = 'train.csv'
     test_csv_path: str = 'test.csv'
+    greeks_csv_path: str = 'greeks.csv'
     persistent_workers: bool = False
     pin_memory: bool = True
     num_workers: int = 0
@@ -29,12 +30,26 @@ class ICRDatasetConfig(BaseConfig):
     under_sampling_config: Optional[UnderSamplingConfig] = None
     """pass None to NOT using under-sampling"""
 
-    smote_strategy: Optional[float] = None
-    """pass None or False to NOT using over-sampling"""
+    class OverSamplingConfig(BaseConfig):
+
+        sampling_strategy: Union[float, dict, Literal['auto']] = 1.
+
+        method: Literal['smote', 'random']
+
+    # over_sampling_strategy: Optional[Union[float, dict]] = None
+
+    over_sampling_config: Optional[OverSamplingConfig] = None
+    """pass None to NOT using over-sampling"""
+
 
     @model_validator(mode='after')
     def check_sampling_mutual_exclusive(self):
-        assert bool(self.under_sampling_config) != bool(self.smote_strategy), (
-                'got both under-samping_config and smote_strategy'
+        assert bool(self.under_sampling_config) != bool(self.over_sampling_config), (
+                'got both under-samping_config and over_sampling config'
             )
         return self
+    
+    labels: Literal['class', 'alpha'] = 'class'
+
+    epsilon_as_feature: bool = False
+

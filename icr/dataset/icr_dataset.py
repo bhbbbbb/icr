@@ -1,5 +1,6 @@
 from __future__ import annotations
 # import os
+from datetime import datetime
 from typing import (
     Literal, get_args, Tuple, ClassVar, Dict, Sequence, Union, overload
 )
@@ -8,13 +9,16 @@ import pandas as pd
 import numpy as np
 # from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from imblearn.over_sampling import SMOTENC
+from sklearn.impute import SimpleImputer
+from imblearn.over_sampling import SMOTENC, RandomOverSampler
 
 from .icr_dataset_config import ICRDatasetConfig
+from .df_cache import DfCache
 
 ModeT = Literal['train', 'valid', 'infer']
 CAT_COL = 'EJ'
 CLASS_COL = 'Class'
+EPSILON_COL = 'Epsilon'
 
 class ICRDataset(Dataset):
     """ICR Dataset
@@ -31,7 +35,7 @@ class ICRDataset(Dataset):
 
     """
 
-    _df_cache: ClassVar[Dict[str, pd.DataFrame]] = {}
+    _df_cache: ClassVar[DfCache] = DfCache()
 
     def __init__(
         self,
@@ -43,68 +47,76 @@ class ICRDataset(Dataset):
         self.mode = mode
         
         path = config.train_csv_path if mode == 'train' else config.test_csv_path
-        self.df = ICRDataset._load_df(path, config.standard_scale_enable)
-        self.smote = (
-            SMOTENC(
-                [self.df.columns.get_loc(CAT_COL)],
-                sampling_strategy=config.smote_strategy
-            )
-            if config.smote_strategy is not None else
-            None
+        self.df, self.class_ser, self.alpha_ser = ICRDataset._load_df(
+            path,
+            config.greeks_csv_path,
+            config.standard_scale_enable,
+            config.epsilon_as_feature,
+        )
+        
+
+        self.over_sampler = self._load_over_sampler(
+            config.over_sampling_config,
+            self.df.columns.get_loc(CAT_COL),
         )
         return
 
     @classmethod
-    def _load_df(cls, path: str, standard_scale_enable: bool):
+    def _load_over_sampler(
+        cls,
+        os_config: ICRDatasetConfig.OverSamplingConfig,
+        cat_col_idx: int,
+    ):
 
-        # def _train_test_split(df: pd.DataFrame, cache_dir: str):
-        #     """load split indices if split.csv in cache_dir. Else
-        #     split train.csv and save the result into
-
-        #     Args:
-        #         df (pd.DataFrame): _description_
-        #         cache_dir (str): _description_
-
-        #     Returns:
-        #         _type_: _description_
-        #     """
-        #     train_path = os.path.join(cache_dir, 'train_split.csv')
-        #     valid_path = os.path.join(cache_dir, 'valid_split.csv')
-
-        #     if os.path.isfile(train_path) and os.path.isfile(valid_path):
-        #         train_idices = pd.read_csv(train_path)['indices']
-        #         valid_idices = pd.read_csv(valid_path)['indices']
-        #         return train_idices, valid_idices
-
-        #     train_df, valid_df = train_test_split(
-        #         df,
-        #         random_state=104,
-        #         test_size=0.15,
-        #         shuffle=True,
-        #         stratify=df[CLASS_COL],
-        #     )
-        #     train_df: pd.DataFrame
-        #     valid_df: pd.DataFrame
-        #     train_df.index.to_frame(name='indices').to_csv(train_path, index=False)
-        #     valid_df.index.to_frame(name='indices').to_csv(valid_path, index=False)
-        #     return train_df.index, valid_df.index
-
-        df = cls._df_cache.get(path, None)
-        if df is not None:
-            return df.copy()
-
-        df = pd.read_csv(path)
-        df.drop(columns=['Id'], inplace=True)
-        df.fillna(df.mean(), inplace=True)
-        df[CAT_COL] = df[CAT_COL].map({'A': 0, 'B': 1})
+        assert os_config.method in ['smote', 'random']
         
+        if os_config.method == 'smote':
+            return SMOTENC([cat_col_idx], sampling_strategy=os_config.sampling_strategy)
+
+        return RandomOverSampler(sampling_strategy=os_config.sampling_strategy)
+
+
+    @classmethod
+    def _load_df(
+        cls,
+        path: str,
+        meta_path: str,
+        standard_scale_enable: bool,
+        epsilon_as_feature: bool,
+    ):
+
+        df = cls._df_cache.get_copy(path)
+        meta_df = cls._df_cache.get_copy(meta_path)
+
+        df.drop(columns=['Id'], inplace=True)
+        # df.fillna(df.mean(), inplace=True)
+        df[CAT_COL] = df[CAT_COL].map({'A': 0, 'B': 1})
+        class_df = df[CLASS_COL]
+        df = df.drop([CLASS_COL], axis=1)
+
+        alpha_values = ['A', 'B', 'D', 'G']
+        # alpha_df = pd.DataFrame({v: (meta.Alpha == v).astype(int) for v in alpha_values})
+        alpha_df = meta_df.Alpha.map({v: i for i, v in enumerate(alpha_values)})
+
+        if epsilon_as_feature:
+            # TODO: test set situation
+            epsilon = meta_df[EPSILON_COL]
+            def mapper(date_str: str):
+                if date_str == 'Unknown':
+                    return np.nan
+                return datetime.strptime(date_str, '%m/%d/%Y').toordinal()
+
+            epsilon = epsilon.map(mapper)
+            df.insert(len(df.columns), EPSILON_COL, epsilon)
+        
+        imputer = SimpleImputer(strategy='median')
+        df.iloc[:, :] = imputer.fit_transform(df)
+
         if standard_scale_enable:
             scaler = StandardScaler()
-            df.iloc[:, df.columns != CLASS_COL] = scaler.fit_transform(
-                df.iloc[:, df.columns != CLASS_COL])
-            
-            cls._df_cache[path] = df
-        return df
+            df.iloc[:, :] = scaler.fit_transform(df)
+        
+        return df, class_df, alpha_df
 
     @classmethod
     def _get_under_sampler(
@@ -112,7 +124,6 @@ class ICRDataset(Dataset):
         labels: pd.Series,
         config: ICRDatasetConfig.UnderSamplingConfig
     ):
-        # labels = self.df[CLASS_COL]
         class_weights = config.class_sample_weights / labels.value_counts()
         sample_weights: pd.Series = labels.map(class_weights)
         return WeightedRandomSampler(
@@ -146,7 +157,8 @@ class ICRDataset(Dataset):
 
         # mode == 'train'
         if self.config.under_sampling_config is not None:
-            labels = self.df[CLASS_COL]
+            assert self.config.labels == 'class'
+            labels = self.class_ser
             sampler = self._get_under_sampler(labels, self.config.under_sampling_config)
 
             return DataLoader(self,
@@ -158,7 +170,7 @@ class ICRDataset(Dataset):
                                 sampler=sampler)
 
 
-        return DataLoader(self.new_smote_dataset(),
+        return DataLoader(self.new_over_sampled_dataset(),
                             batch_size=batch_size,
                             num_workers=self.config.num_workers,
                             persistent_workers=self.config.persistent_workers,
@@ -166,11 +178,10 @@ class ICRDataset(Dataset):
                             drop_last=True,
                             shuffle=True)
 
-    def new_smote_dataset(self) -> SmoteDataset:
+    def new_over_sampled_dataset(self) -> OverSampledDataset:
         assert self.mode == 'train'
-        assert self.config.smote_strategy and self.smote is not None
-        x, y = self.smote.fit_resample(*(self[:]))
-        return SmoteDataset(x, y)
+        x, y = self.over_sampler.fit_resample(*(self[:]))
+        return OverSampledDataset(x, y)
     
     def make_subset(self, indices: list, mode: ModeT) -> ICRDataset:
         """Get Subset. Define a way to split the dataset with the given indices.
@@ -188,6 +199,7 @@ class ICRDataset(Dataset):
         subset = ICRDataset('train', self.config)
         subset.mode = mode
         subset.df = subset.df.iloc[indices]
+        subset.alpha_ser = subset.alpha_ser.iloc[indices]
         return subset
 
     def __len__(self):
@@ -224,16 +236,20 @@ class ICRDataset(Dataset):
                 labels(int): 
         """
         index = [index] if isinstance(index, int) else index
-        row = self.df.iloc[index]
+        features = self.df.iloc[index]
         if self.mode == 'infer':
-            return row.to_numpy()
+            return features.to_numpy()
 
-        features = row.drop(CLASS_COL, axis=1)
-        label = row[CLASS_COL]
+        labels = (
+            self.class_ser[index]
+            if self.config.labels == 'class' else
+            self.alpha_ser[index]
+        )
 
-        return features.to_numpy().squeeze(), label.to_numpy().squeeze()
 
-class SmoteDataset(Dataset):
+        return features.to_numpy().squeeze(), labels.to_numpy().squeeze()
+
+class OverSampledDataset(Dataset):
     """Simple wrapper dataset for SMOTE (since smote regenerate date every time)"""
 
     def __init__(self, x: np.ndarray, y: np.ndarray):
@@ -246,3 +262,36 @@ class SmoteDataset(Dataset):
 
     def __getitem__(self, index):
         return self.x[index], self.y[index]
+
+
+        # def _train_test_split(df: pd.DataFrame, cache_dir: str):
+        #     """load split indices if split.csv in cache_dir. Else
+        #     split train.csv and save the result into
+
+        #     Args:
+        #         df (pd.DataFrame): _description_
+        #         cache_dir (str): _description_
+
+        #     Returns:
+        #         _type_: _description_
+        #     """
+        #     train_path = os.path.join(cache_dir, 'train_split.csv')
+        #     valid_path = os.path.join(cache_dir, 'valid_split.csv')
+
+        #     if os.path.isfile(train_path) and os.path.isfile(valid_path):
+        #         train_idices = pd.read_csv(train_path)['indices']
+        #         valid_idices = pd.read_csv(valid_path)['indices']
+        #         return train_idices, valid_idices
+
+        #     train_df, valid_df = train_test_split(
+        #         df,
+        #         random_state=104,
+        #         test_size=0.15,
+        #         shuffle=True,
+        #         stratify=df[CLASS_COL],
+        #     )
+        #     train_df: pd.DataFrame
+        #     valid_df: pd.DataFrame
+        #     train_df.index.to_frame(name='indices').to_csv(train_path, index=False)
+        #     valid_df.index.to_frame(name='indices').to_csv(valid_path, index=False)
+        #     return train_df.index, valid_df.index
