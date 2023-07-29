@@ -1,4 +1,4 @@
-xgb_params = {
+xgb_params0 = {
     'learning_rate': 0.413327571405248,
     'booster': 'gbtree',
     'lambda': 0.0000263894617720096,
@@ -102,4 +102,22 @@ xgb_params6 = {
     'colsample_bytree': 0.38872702868412506,
     'colsample_bylevel': 0.8321880031718571,
     'colsample_bynode': 0.802355707802605,
+}
+
+profiles_list = [
+    xgb_params0,
+    xgb_params1,
+    xgb_params2,
+    xgb_params3,
+    xgb_params4,
+    xgb_params5,
+    xgb_params6,
+]
+multi_profile_list = [
+    {**profile, 'objective': 'multi:softprob', 'eval_metric': 'mlogloss'}\
+        for profile in profiles_list
+]
+profiles = {
+    **{ f'xgb{idx}': params for idx, params in enumerate(profiles_list) },
+    **{ f'mxgb{idx}': params for idx, params in enumerate(multi_profile_list) },
 }

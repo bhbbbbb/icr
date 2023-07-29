@@ -5,7 +5,7 @@ class _Model(Protocol):
 
     def fit(self, x, y) -> None:...
 
-    def predict_prob(self, x) -> np.ndarray:...
+    def predict_proba(self, x) -> np.ndarray:...
 
 
 class Ensemble:
@@ -27,16 +27,13 @@ class Ensemble:
                 return {}
             params = get_params()
             model.fit(x, y, **params)
-        return
+        return self
     
-    def predict_prob(self, x):
+    def predict_proba(self, x):
 
         predictions = np.zeros(len(x), dtype=np.float64)
         for model in self.models.values():
-            res = model.predict_prob(x)
-            prediction = res[:, 0].squeeze()
-            prediction = 1 - prediction
-            predictions += prediction
+            res = model.predict_proba(x)
+            predictions += res
         
         return predictions / len(self.models)
- 
