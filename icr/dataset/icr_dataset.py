@@ -2,9 +2,9 @@ from __future__ import annotations
 # import os
 from datetime import datetime
 from typing import (
-    Literal, get_args, Tuple, ClassVar, Dict, Sequence, Union, overload
+    Literal, get_args, Tuple, ClassVar, Sequence, Union, overload
 )
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler, Dataset
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 import pandas as pd
 import numpy as np
 # from sklearn.model_selection import train_test_split
@@ -46,10 +46,10 @@ class ICRDataset(Dataset):
         self.config = config
         self.mode = mode
         
-        path = config.train_csv_path if mode == 'train' else config.test_csv_path
-        self.df, self.class_ser, self.alpha_ser = ICRDataset._load_df(
-            path,
+        self.df, self.class_ser, self.alpha_ser, self.test_df = ICRDataset._load_df(
+            config.train_csv_path,
             config.greeks_csv_path,
+            config.test_csv_path,
             config.standard_scale_enable,
             config.epsilon_as_feature,
         )
@@ -79,27 +79,28 @@ class ICRDataset(Dataset):
     @classmethod
     def _load_df(
         cls,
-        path: str,
+        train_path: str,
         meta_path: str,
+        test_path: str,
         standard_scale_enable: bool,
         epsilon_as_feature: bool,
     ):
 
-        df = cls._df_cache.get_copy(path)
+        train_df = cls._df_cache.get_copy(train_path)
         meta_df = cls._df_cache.get_copy(meta_path)
+        test_df = cls._df_cache.get_copy(test_path)
 
-        df.drop(columns=['Id'], inplace=True)
-        # df.fillna(df.mean(), inplace=True)
-        df[CAT_COL] = df[CAT_COL].map({'A': 0, 'B': 1})
-        class_df = df[CLASS_COL]
-        df = df.drop([CLASS_COL], axis=1)
+        train_df.drop(columns=['Id'], inplace=True)
+        train_df[CAT_COL] = train_df[CAT_COL].map({'A': 0, 'B': 1})
+        test_df.drop(columns=['Id'], inplace=True)
+        test_df[CAT_COL] = test_df[CAT_COL].map({'A': 0, 'B': 1})
+        class_df = train_df[CLASS_COL]
+        train_df = train_df.drop([CLASS_COL], axis=1)
 
         alpha_values = ['A', 'B', 'D', 'G']
-        # alpha_df = pd.DataFrame({v: (meta.Alpha == v).astype(int) for v in alpha_values})
         alpha_df = meta_df.Alpha.map({v: i for i, v in enumerate(alpha_values)})
 
         if epsilon_as_feature:
-            # TODO: test set situation
             epsilon = meta_df[EPSILON_COL]
             def mapper(date_str: str):
                 if date_str == 'Unknown':
@@ -107,16 +108,23 @@ class ICRDataset(Dataset):
                 return datetime.strptime(date_str, '%m/%d/%Y').toordinal()
 
             epsilon = epsilon.map(mapper)
-            df.insert(len(df.columns), EPSILON_COL, epsilon)
+            train_df.insert(len(train_df.columns), EPSILON_COL, epsilon)
+
+            # --------- test csv ----------------
+            test_epsilon = [epsilon.max() for _ in range(len(test_df))]
+            test_df.insert(len(test_df.columns), EPSILON_COL, test_epsilon)
+
         
         imputer = SimpleImputer(strategy='median')
-        df.iloc[:, :] = imputer.fit_transform(df)
+        train_df.iloc[:, :] = imputer.fit_transform(train_df)
+        test_df.iloc[:, :] = imputer.transform(test_df)
 
         if standard_scale_enable:
             scaler = StandardScaler()
-            df.iloc[:, :] = scaler.fit_transform(df)
+            train_df.iloc[:, :] = scaler.fit_transform(train_df)
+            test_df.iloc[:, :] = scaler.transform(test_df)
         
-        return df, class_df, alpha_df
+        return train_df, class_df, alpha_df, test_df
 
     @classmethod
     def _get_under_sampler(
@@ -212,7 +220,7 @@ class ICRDataset(Dataset):
         return subset
 
     def __len__(self):
-        return len(self.df)
+        return len(self.df) if self.mode != 'infer' else len(self.test_df)
 
     
     @overload
@@ -245,10 +253,10 @@ class ICRDataset(Dataset):
                 labels(int): 
         """
         index = [index] if isinstance(index, int) else index
-        features = self.df.iloc[index]
         if self.mode == 'infer':
-            return features.to_numpy()
+            return self.test_df.iloc[index].to_numpy()
 
+        features = self.df.iloc[index]
         labels = (
             self.class_ser[index]
             if self.config.labels == 'class' else

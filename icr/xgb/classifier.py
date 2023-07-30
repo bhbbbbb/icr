@@ -1,3 +1,6 @@
+from __future__ import annotations
+import os
+import pickle
 from typing import overload
 import numpy as np
 from xgboost import XGBClassifier
@@ -7,7 +10,7 @@ from .params import profiles
 
 class ICRXGBClassfier:
 
-    def __init__(self, class_labels: np.ndarray, seed: int, profile: str):
+    def __init__(self, class_labels: np.ndarray, seed: int, profile: str, **kwargs):
 
         assert profile in profiles
 
@@ -17,6 +20,8 @@ class ICRXGBClassfier:
             seed,
         )
         self.seed = seed
+        self.kwargs = kwargs
+        self.profile = profile
         return
     
     @staticmethod
@@ -47,6 +52,11 @@ class ICRXGBClassfier:
     def fit(self, x_train, y_train, x_valid, y_valid):...
 
     def fit(self, x, y, x_valid = None, y_valid = None):
+        if x_valid is None:
+            x_valid = self.kwargs.get('x_valid', None)
+        if y_valid is None:
+            y_valid = self.kwargs.get('y_valid', None)
+
         assert x_valid is not None and y_valid is not None
         self._fit(x, y, x_valid, y_valid)
         return
@@ -75,3 +85,18 @@ class ICRXGBClassfier:
         res = self.classifier.predict_proba(x)
 
         return res if no_reshape else (1. - res[:, 0]).squeeze()
+    
+    def set_params(self, **params):
+        return self.classifier.set_params(**params)
+
+
+    def save(self, save_dir: str, name: str):
+        with open(os.path.join(save_dir, f'{name}.pkl'), mode='wb') as fout:
+            pickle.dump(self, fout)
+        return
+        
+    @classmethod
+    def load_classifer(cls, load_dir: str, name: str) -> ICRXGBClassfier:
+        with open(os.path.join(load_dir, name), mode='rb') as fin:
+            classifier = pickle.load(fin)
+        return classifier
