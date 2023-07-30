@@ -36,7 +36,8 @@ class ICRXGBClassfier:
 
     @staticmethod
     def _get_scale_pos_weight(labels: np.ndarray):
-        return (labels == 0).sum() / (labels != 0).sum()
+        # tem = (labels != 0).sum() / (labels == 0).sum()
+        return 1.
 
     @staticmethod
     def _get_xgb_classifier(params: dict, class_labels: np.ndarray, seed):

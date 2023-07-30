@@ -61,6 +61,10 @@ class ICRDataset(Dataset):
         )
         return
 
+    @property
+    def cat_column_locate(self):
+        return self.df.columns.get_loc(CAT_COL)
+
     @classmethod
     def _load_over_sampler(
         cls,

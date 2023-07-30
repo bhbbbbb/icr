@@ -14,8 +14,8 @@ xgb_params0 = {
     'objective': 'binary:logistic',
     'eval_metric': 'logloss',
     'verbosity': 0,
-    'tree_method': 'gpu_hist',
-    'predictor': 'gpu_predictor',
+    # 'tree_method': 'gpu_hist',
+    # 'predictor': 'gpu_predictor',
 }
 xgb_params1 = {
     'n_estimators': 900,
@@ -33,6 +33,8 @@ xgb_params1 = {
     'objective': 'binary:logistic',
     'eval_metric': 'logloss',
     'verbosity': 0,
+    # 'tree_method': 'gpu_hist',
+    # 'predictor': 'gpu_predictor',
 }
 
 xgb_params2 = {
@@ -51,6 +53,8 @@ xgb_params2 = {
     'objective': 'binary:logistic',
     'eval_metric': 'logloss',
     'verbosity': 0,
+    # 'tree_method': 'gpu_hist',
+    # 'predictor': 'gpu_predictor',
 }
 
 xgb_params3 = {
@@ -67,6 +71,8 @@ xgb_params3 = {
     'max_depth': 3,
     'n_jobs': -1,
     'verbosity': 0,
+    # 'tree_method': 'gpu_hist',
+    # 'predictor': 'gpu_predictor',
 }
 
 xgb_params4 = {
