@@ -110,7 +110,88 @@ xgb_params6 = {
     'colsample_bynode': 0.802355707802605,
 }
 
-profiles_list = [
+lgb_params0 = {
+    'n_estimators': 300,
+    'objective': 'binary',
+    'boosting_type': 'gbdt',
+    'learning_rate': 0.05,
+    'num_leaves': 5,
+    'min_data_in_leaf': 50,
+    'colsample_bytree': 0.50,
+    'subsample': 0.80,
+    'reg_alpha': 2, 
+    'reg_lambda': 4,
+    'n_jobs': -1,
+    'is_unbalance':True,
+}
+lgb_params1 = {
+    'n_estimators': 200,
+    'learning_rate': 0.190197487721534,
+    'reg_alpha': 0.00749112221417973,
+    'reg_lambda': 0.000548118227209224,
+    'num_leaves': 17,
+    'colsample_bytree': 0.547257860506146,
+    'subsample': 0.592628085686409,
+    'subsample_freq': 2,
+    'min_child_samples': 64,
+    'objective': 'binary',
+    #'metric': 'binary_error',
+    'boosting_type': 'gbdt',
+    'is_unbalance':True,
+} 
+lgb_params2 = {
+    'n_estimators': 300,
+    'learning_rate': 0.151326407627473,
+    # 'learning_rate': 0.181326407627473,
+    'reg_alpha': 0.000030864084239014,
+    'reg_lambda': 0.0000395714763869486,
+    'num_leaves': 122,
+    'colsample_bytree': 0.75076596295323,
+    'subsample': 0.6303245788342,
+    'subsample_freq': 3,
+    'min_child_samples': 72,
+    'objective': 'binary',
+    #'metric': 'binary_error',
+    'boosting_type': 'gbdt',
+    'is_unbalance':True,
+} 
+lgb_params3 = {
+    'n_estimators': 3000,
+    'learning_rate': 0.05,
+    'objective': 'binary',
+    'boosting_type': 'gbdt',
+    'num_leaves': 5,
+    'max_depth': 5,
+    'max_bin': 500,
+    'min_gain_to_split': 0.01,
+    'min_data_in_leaf': 80,
+    'min_sum_hessian_in_leaf': 1e-2,
+    'colsample_bytree': 0.50,
+    'subsample': 0.80,
+    'reg_alpha': 2, 
+    'reg_lambda': 4,
+    'n_jobs': -1,
+    'is_unbalance':True,
+} 
+lgb_params4 = {
+    'n_estimators': 5000,
+    'learning_rate': 0.0101326407627473,
+    # 'learning_rate': 0.181326407627473,
+    'reg_alpha': 0.000030864084239014,
+    'reg_lambda': 0.0000395714763869486,
+    'num_leaves': 322,
+    'max_bin': 500,
+    'colsample_bytree': 0.75076596295323,
+    'subsample': 0.6303245788342,
+    'subsample_freq': 3,
+    'min_child_samples': 72,
+    'objective': 'binary',
+    #'metric': 'binary_error',
+    'boosting_type': 'gbdt',
+    'is_unbalance':True,
+} 
+
+xgb_profiles_list = [
     xgb_params0,
     xgb_params1,
     xgb_params2,
@@ -119,11 +200,21 @@ profiles_list = [
     xgb_params5,
     xgb_params6,
 ]
-multi_profile_list = [
-    {**profile, 'objective': 'multi:softprob', 'eval_metric': 'mlogloss'}\
-        for profile in profiles_list
+lgb_profiles_list = [
+    lgb_params0,
+    lgb_params1,
+    lgb_params2,
+    lgb_params3,
+    lgb_params4,
 ]
+
+xgb_multi_profile_list = [
+    {**profile, 'objective': 'multi:softprob', 'eval_metric': 'mlogloss'}\
+        for profile in xgb_profiles_list
+]
+
 profiles = {
-    **{ f'xgb{idx}': params for idx, params in enumerate(profiles_list) },
-    **{ f'mxgb{idx}': params for idx, params in enumerate(multi_profile_list) },
+    **{ f'xgb{idx}': params for idx, params in enumerate(xgb_profiles_list) },
+    **{ f'mxgb{idx}': params for idx, params in enumerate(xgb_multi_profile_list) },
+    **{ f'lgb{idx}': params for idx, params in enumerate(lgb_profiles_list) },
 }

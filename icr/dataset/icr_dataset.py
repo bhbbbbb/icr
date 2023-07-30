@@ -125,8 +125,12 @@ class ICRDataset(Dataset):
 
         if standard_scale_enable:
             scaler = StandardScaler()
+            train_cat_col = train_df[CAT_COL].copy()
+            test_cat_col = test_df[CAT_COL].copy()
             train_df.iloc[:, :] = scaler.fit_transform(train_df)
             test_df.iloc[:, :] = scaler.transform(test_df)
+            train_df[CAT_COL] = train_cat_col
+            test_df[CAT_COL] = test_cat_col
         
         return train_df, class_df, alpha_df, test_df
 

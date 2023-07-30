@@ -1,53 +1,44 @@
 from __future__ import annotations
 import os
-import pickle
 from typing import overload
-import numpy as np
-from xgboost import XGBClassifier
-from .xgb_config import XGBConfig
+import pickle
+
+from lightgbm import LGBMClassifier
 from .params import profiles
+from .base import get_sample_weights
+# import numpy as np
 
 
-class ICRXGBClassfier:
+class ICRLGBClassifier:
 
-    def __init__(self, class_labels: np.ndarray, seed: int, profile: str, **kwargs):
+    def __init__(self, cat_col_index: int, seed: int, profile: str,**kwargs):
 
         assert profile in profiles
+        assert 'lgb' in profile
 
-        self.classifier = ICRXGBClassfier._get_xgb_classifier(
+        self.classifier = ICRLGBClassifier._get_lgb_classifier(
             profiles[profile],
-            class_labels,
             seed,
         )
         self.seed = seed
         self.kwargs = kwargs
         self.profile = profile
+        self.cat_col_index = cat_col_index
         return
     
-    @staticmethod
-    def __get_class_weights(y: np.ndarray):
-        negative_count = (y == 0).sum()
-        return len(y) / np.array([negative_count, len(y) - negative_count])
+    # @staticmethod
+    # def _get_scale_pos_weight(labels: np.ndarray):
+    #     # tem = (labels != 0).sum() / (labels == 0).sum()
+    #     return 1.
 
     @staticmethod
-    def _get_sample_weights(y: np.ndarray):
-        class_weights = ICRXGBClassfier.__get_class_weights(y)
-        return class_weights[(y != 0).astype(int)]
-
-    @staticmethod
-    def _get_scale_pos_weight(labels: np.ndarray):
-        # tem = (labels != 0).sum() / (labels == 0).sum()
-        return 1.
-
-    @staticmethod
-    def _get_xgb_classifier(params: dict, class_labels: np.ndarray, seed):
-        xgb_config = XGBConfig(
-            **{
-                **params,
-                'scale_pos_weight': ICRXGBClassfier._get_scale_pos_weight(class_labels)
-            }
+    def _get_lgb_classifier(params: dict, seed):
+        return LGBMClassifier(
+            **params,
+            random_state = seed,
+            verbose = -1,
+            early_stopping_round = 999,
         )
-        return XGBClassifier(**{**xgb_config.model_dump(), 'random_state': seed})
     
     @overload
     def fit(self, x_train, y_train, x_valid, y_valid):...
@@ -65,11 +56,10 @@ class ICRXGBClassfier:
     def _fit(self, x_train, y_train, x_valid, y_valid):
         self.classifier.fit(
             x_train, y_train,
-            sample_weight=ICRXGBClassfier._get_sample_weights(y_train),
+            sample_weight=get_sample_weights(y_train),
             eval_set = [(x_valid, y_valid)],
-            sample_weight_eval_set = [ICRXGBClassfier._get_sample_weights(y_valid)],
-            # verbose = True,
-            verbose = False,
+            eval_sample_weight = [get_sample_weights(y_valid)],
+            categorical_feature=[self.cat_col_index],
         )
         return self
 
@@ -97,7 +87,7 @@ class ICRXGBClassfier:
         return
         
     @classmethod
-    def load_classifer(cls, load_dir: str, name: str) -> ICRXGBClassfier:
+    def load_classifer(cls, load_dir: str, name: str) -> ICRLGBClassifier:
         with open(os.path.join(load_dir, name), mode='rb') as fin:
             classifier = pickle.load(fin)
         return classifier
