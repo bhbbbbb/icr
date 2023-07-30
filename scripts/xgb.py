@@ -117,13 +117,13 @@ def main():
         greeks_csv_path=os.path.join(dataset_dir, 'greeks.csv'),
         over_sampling_config=Config.OverSamplingConfig(
             # sampling_strategy=.5,
-            sampling_strategy={0: 509, 1: 122, 2: 36, 3: 58},
+            sampling_strategy={0: 408, 1: 98, 2: 29, 3: 47},
             method='smote',
         ),
         labels='alpha',
         epsilon_as_feature=True,
-        xgb_profile=['xgb1', 'xgb2', 'xgb3'],
-        # xgb_profile='xgb3'
+        # xgb_profile=['xgb1', 'xgb2', 'xgb3'],
+        xgb_profile='xgb3'
     )
     config.display()
     k = 5

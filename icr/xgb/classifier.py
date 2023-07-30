@@ -29,13 +29,16 @@ class ICRXGBClassfier:
         class_weights = ICRXGBClassfier.__get_class_weights(y)
         return class_weights[(y != 0).astype(int)]
 
+    @staticmethod
+    def _get_scale_pos_weight(labels: np.ndarray):
+        return (labels == 0).sum() / (labels != 0).sum()
 
     @staticmethod
     def _get_xgb_classifier(params: dict, class_labels: np.ndarray, seed):
         xgb_config = XGBConfig(
             **{
                 **params,
-                'scale_pos_weight': XGBConfig.get_scale_pos_weight(class_labels)
+                'scale_pos_weight': ICRXGBClassfier._get_scale_pos_weight(class_labels)
             }
         )
         return XGBClassifier(**{**xgb_config.model_dump(), 'random_state': seed})
@@ -59,14 +62,16 @@ class ICRXGBClassfier:
         )
         return self
 
-    def predict_proba(self, x):
+    def predict_proba(self, x, no_reshape: bool = False, **_kwargs):
         """_summary_
 
         Args:
             x (_type_): _description_
+            no_reshape (bool): pass True to return original output of predcit_prob
 
         Returns:
             np.ndarry (n_samples, )
         """
         res = self.classifier.predict_proba(x)
-        return (1. - res[:, 0]).squeeze()
+
+        return res if no_reshape else (1. - res[:, 0]).squeeze()

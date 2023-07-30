@@ -7,10 +7,12 @@ from sklearn.model_selection import StratifiedKFold, KFold
 import numpy as np
 
 from pydantic import model_validator
+from termcolor import cprint, colored
 
 from icr.dataset import ICRDataset, ICRDatasetConfig
 from icr.tools import balanced_log_loss, seed_everything
 from icr.xgb import ICRXGBClassfier
+from icr.model_utils.ensemble import Ensemble
 
 from sklearn.metrics import confusion_matrix
 from model_utils.config import BaseConfig
@@ -52,10 +54,9 @@ class Config(ICRDatasetConfig):
     learning_rate: float = 1e-4
     # smote_strategy: float = .5
     # labels: typing.Literal['class', 'alpha'] = 'class'
-    smote_strategy: dict = {0: 509, 1: 122, 2: 36, 3: 58}
     labels: typing.Literal['class', 'alpha'] = 'alpha'
     # standard_scale_enable: bool = False
-    xgb_profile: typing.Union[str, typing.Sequence[str]]
+    mxgb_profile: typing.Union[str, typing.Sequence[str]]
 
 
 def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
@@ -77,15 +78,24 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
         valid_subset = train_set.make_subset(valid_indices, 'valid')
 
         train_subset = train_subset.new_over_sampled_dataset()
-        x_train, y_train = train_subset[:]
-        x_valid, y_valid = valid_subset[:]
-        class_train = (y_train != 0).astype(int)
-        class_valid = (y_valid != 0).astype(int)
+        x_train, alpha_train = train_subset[:]
+        x_valid, alpha_valid = valid_subset[:]
+        class_train = (alpha_train != 0).astype(int)
+        class_valid = (alpha_valid != 0).astype(int)
 
 
-        classifier = ICRXGBClassfier(class_train, seed, profile=config.xgb_profile)
-
-        classifier.fit(x_train, y_train, x_valid, y_valid)
+        if isinstance(config.mxgb_profile, str):
+            classifier = ICRXGBClassfier(alpha_train, seed, config.mxgb_profile)
+            classifier.fit(x_train, alpha_train, x_valid, alpha_valid)
+        
+        else:
+            classifier = Ensemble(
+                {
+                    profile: ICRXGBClassfier(alpha_train, seed, profile)\
+                        for profile in config.mxgb_profile
+                },
+            )
+            classifier.fit(x_train, alpha_train, xgb={'x_valid': x_valid, 'y_valid': alpha_valid})
 
         prediction = classifier.predict_proba(x_valid)
         # res: (n_samples, 2[class0, class1])
@@ -95,12 +105,19 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
         eval_loss = balanced_log_loss(prediction, class_valid)
         mat = confusion_matrix(class_valid, (prediction > .5).astype(int))
         tn, fp, fn, tp = mat.ravel()
-        precsion = tp / (tp + fp)
+        precision = tp / (tp + fp)
         recall = tp / (tp + fn)
         print(f'eval_loss = {eval_loss}')
-        print(f'precision: {precsion}, recall: {recall}')
+        def get_color(my, other):
+            if my == 1.:
+                return 'green'
+            return 'green' if my > other else 'red'
+        precision_str = colored(f'{precision:.3f}', get_color(precision, recall))
+        recall_str = colored(f'{recall:.3f}', get_color(recall, precision))
+
+        print(f'precision: {precision_str}, recall: {recall_str}')
         cv_loss[fold] = eval_loss
-        ps[fold] = precsion
+        ps[fold] = precision
         rs[fold] = recall
         
     
@@ -123,7 +140,7 @@ def main():
             method='smote',
         ),
         epsilon_as_feature=True,
-        xgb_profile='mxgb3',
+        mxgb_profile=['mxgb1', 'mxgb2', 'mxgb3'],
     )
     config.display()
     k = 5

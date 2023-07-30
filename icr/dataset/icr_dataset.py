@@ -178,9 +178,17 @@ class ICRDataset(Dataset):
                             drop_last=True,
                             shuffle=True)
 
-    def new_over_sampled_dataset(self) -> OverSampledDataset:
+    def new_over_sampled_dataset(
+            self,
+            over_sample_config: ICRDatasetConfig.OverSamplingConfig = None,
+        ) -> OverSampledDataset:
         assert self.mode == 'train'
-        x, y = self.over_sampler.fit_resample(*(self[:]))
+        sampler = (
+            self.over_sampler
+            if over_sample_config is None else
+            self._load_over_sampler(over_sample_config, self.df.columns.get_loc(CAT_COL))
+        )
+        x, y = sampler.fit_resample(*(self[:]))
         return OverSampledDataset(x, y)
     
     def make_subset(self, indices: list, mode: ModeT) -> ICRDataset:
@@ -199,6 +207,7 @@ class ICRDataset(Dataset):
         subset = ICRDataset('train', self.config)
         subset.mode = mode
         subset.df = subset.df.iloc[indices]
+        subset.class_ser = subset.class_ser.iloc[indices]
         subset.alpha_ser = subset.alpha_ser.iloc[indices]
         return subset
 

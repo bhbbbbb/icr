@@ -25,9 +25,5 @@ class XGBConfig(BaseConfig):
     n_jobs: int = -1
     verbosity: int = 0
     
-    @staticmethod
-    def get_scale_pos_weight(labels: np.ndarray):
-        return (labels == 0).sum() / (labels != 0).sum()
-
     scale_pos_weight: float
 
