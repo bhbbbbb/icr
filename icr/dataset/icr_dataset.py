@@ -214,9 +214,9 @@ class ICRDataset(Dataset):
         assert mode in get_args(ModeT)
         subset = ICRDataset('train', self.config)
         subset.mode = mode
-        subset.df = subset.df.iloc[indices]
-        subset.class_ser = subset.class_ser.iloc[indices]
-        subset.alpha_ser = subset.alpha_ser.iloc[indices]
+        subset.df = self.df.iloc[indices]
+        subset.class_ser = self.class_ser.iloc[indices]
+        subset.alpha_ser = self.alpha_ser.iloc[indices]
         return subset
 
     def __len__(self):
