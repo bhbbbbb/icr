@@ -19,7 +19,8 @@ def precision_recall(y_pred: np.ndarray, y_true: np.ndarray):
     tn, fp, fn, tp = mat.ravel()
     precision = tp / (tp + fp)
     recall = tp / (tp + fn)
-    return precision, recall
+    wrongs = fp + fn
+    return precision, recall, wrongs
 
 def color_precision_recall(precision, recall):
     def get_color(my, other):

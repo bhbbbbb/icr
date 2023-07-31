@@ -12,7 +12,7 @@ import pandas as pd
 from pydantic import model_validator
 
 from icr.dataset import ICRDataset, ICRDatasetConfig
-from icr.xgb import ICRXGBClassfier
+from icr.classifier import ICRXGBClassfier
 from icr.model_utils.ensemble import Ensemble
 
 from icr.tools import balanced_log_loss, seed_everything, precision_recall, color_precision_recall

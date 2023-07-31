@@ -8,15 +8,15 @@ from .params import profiles
 from .base import get_sample_weights
 
 
-class ICRXGBClassfier:
+class ICRXGBClassifier:
 
     def __init__(self, class_labels: np.ndarray, seed: int, profile: str, **kwargs):
 
         assert profile in profiles
         assert 'xgb' in profile
 
-        self.classifier = ICRXGBClassfier._get_xgb_classifier(
-            profiles[profile],
+        self.classifier = ICRXGBClassifier._get_xgb_classifier(
+            profile,
             class_labels,
             seed,
         )
@@ -32,10 +32,17 @@ class ICRXGBClassfier:
         return 1.
 
     @staticmethod
-    def _get_xgb_classifier(params: dict, class_labels: np.ndarray, seed):
+    def _get_xgb_classifier(profile: str, class_labels: np.ndarray, seed):
+        
+        params = profiles[profile]
+        if 'scale_pos_weight' in params:
+            if 'm' in profile:
+                params.pop('scale_pos_weight')
+            else:
+                params['scale_pos_weight'] =\
+                    ICRXGBClassifier._get_scale_pos_weight(class_labels)
         return XGBClassifier(
             **params,
-            scale_pos_weight = ICRXGBClassfier._get_scale_pos_weight(class_labels),
             early_stopping_rounds = 999,
             random_state = seed,
         )
@@ -88,7 +95,7 @@ class ICRXGBClassfier:
         return
         
     @classmethod
-    def load_classifer(cls, load_dir: str, name: str) -> ICRXGBClassfier:
+    def load_classifer(cls, load_dir: str, name: str) -> ICRXGBClassifier:
         with open(os.path.join(load_dir, name), mode='rb') as fin:
             classifier = pickle.load(fin)
         return classifier

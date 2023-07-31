@@ -213,8 +213,14 @@ xgb_multi_profile_list = [
         for profile in xgb_profiles_list
 ]
 
+lgb_multi_profile_list = [
+    {**profile, 'objective': 'multiclass'}\
+        for profile in lgb_profiles_list
+]
+
 profiles = {
     **{ f'xgb{idx}': params for idx, params in enumerate(xgb_profiles_list) },
     **{ f'mxgb{idx}': params for idx, params in enumerate(xgb_multi_profile_list) },
     **{ f'lgb{idx}': params for idx, params in enumerate(lgb_profiles_list) },
+    **{ f'mlgb{idx}': params for idx, params in enumerate(lgb_multi_profile_list) },
 }

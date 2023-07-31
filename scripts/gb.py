@@ -80,9 +80,9 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
         # prediction[prediction > .8] = 1.
         eval_loss = balanced_log_loss(predictions, class_valid)
         print(f'eval_loss = {eval_loss}')
-        precision, recall = precision_recall(predictions, class_valid)
+        precision, recall, wrongs = precision_recall(predictions, class_valid)
         precision_str, recall_str = color_precision_recall(precision, recall)
-        print(f'precision: {precision_str}, recall: {recall_str}')
+        print(f'precision: {precision_str}, recall: {recall_str}, wrongs: {wrongs}')
         cv_loss[fold] = eval_loss
         ps[fold] = precision
         rs[fold] = recall
@@ -110,7 +110,7 @@ def main():
         epsilon_as_feature=True,
         # xgb_profiles=[f'xgb{i}' for i in range(7)],
         # xgb_profile=['xgb1', 'xgb2', 'xgb3'],
-        profiles=['lgb4']
+        profiles=['xgb6']
     )
     config.display()
     k = 5

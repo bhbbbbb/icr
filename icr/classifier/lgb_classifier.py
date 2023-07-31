@@ -1,6 +1,6 @@
 from __future__ import annotations
 import os
-from typing import overload
+from typing import overload, Union
 import pickle
 
 from lightgbm import LGBMClassifier
@@ -11,7 +11,7 @@ from .base import get_sample_weights
 
 class ICRLGBClassifier:
 
-    def __init__(self, cat_col_index: int, seed: int, profile: str,**kwargs):
+    def __init__(self, cat_col_index: Union[int, None], seed: int, profile: str,**kwargs):
 
         assert profile in profiles
         assert 'lgb' in profile
@@ -59,7 +59,7 @@ class ICRLGBClassifier:
             sample_weight=get_sample_weights(y_train),
             eval_set = [(x_valid, y_valid)],
             eval_sample_weight = [get_sample_weights(y_valid)],
-            categorical_feature=[self.cat_col_index],
+            categorical_feature=[self.cat_col_index] if self.cat_col_index is not None else [],
         )
         return self
 

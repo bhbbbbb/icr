@@ -4,7 +4,7 @@ from typing import overload
 import pickle
 
 # from .params import profiles
-from .xgb_classifier import ICRXGBClassfier
+from .xgb_classifier import ICRXGBClassifier
 from .lgb_classifier import ICRLGBClassifier
 # import numpy as np
 
@@ -21,7 +21,7 @@ class ICRClassifier:
         ):
 
         if 'xgb' in profile:
-            self.classifier = ICRXGBClassfier(
+            self.classifier = ICRXGBClassifier(
                 class_labels=class_labels,
                 seed=seed,
                 profile=profile,
@@ -37,6 +37,9 @@ class ICRClassifier:
 
         return
     
+    @property
+    def profile(self):
+        return self.classifier.profile
     # @staticmethod
     # def _get_scale_pos_weight(labels: np.ndarray):
     #     # tem = (labels != 0).sum() / (labels == 0).sum()
