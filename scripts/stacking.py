@@ -42,6 +42,7 @@ class Config(ICRDatasetConfig):
     inner_profiles: typing.Sequence[str]
     inner_over_sampling_config: ICRDatasetConfig.OverSamplingConfig
     passthrough: bool
+    model_save_dir: str
 
 
 def inner_cv(
@@ -190,7 +191,7 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
         rs[fold] = recall
 
         if fold == k - 1:
-            model_save_dir = os.path.join(dataset_dir, 'models', f'seed-{hex(seed)}')
+            model_save_dir = os.path.join(config.model_save_dir, f'seed-{hex(seed)}')
             for f, models in enumerate(best_modelss):
                 save_dir = os.path.join(model_save_dir, f'fold-{f}')
                 os.makedirs(save_dir, exist_ok=True)
@@ -212,6 +213,7 @@ def main():
         train_csv_path=os.path.join(dataset_dir, 'train.csv'),
         test_csv_path=os.path.join(dataset_dir, 'test.csv'),
         greeks_csv_path=os.path.join(dataset_dir, 'greeks.csv'),
+        model_save_dir=os.path.join(dataset_dir, 'models'),
         over_sampling_config=Config.OverSamplingConfig(
             # sampling_strategy=.5,
             sampling_strategy={0: 408, 1: 98, 2: 29, 3: 47},
@@ -242,6 +244,7 @@ def main():
 
     print('-' * 60)
     print(f'cv_loss = {cv_loss.tolist()}')
+    print(f'cv_loss = {cv_loss.mean(axis=1)}, {cv_loss.std(axis=1)}')
     cprint(f'cv_loss = {cv_loss.mean()}, {cv_loss.std()}', on_color='on_cyan')
     # print('precisions')
     # print(ps.tolist())
