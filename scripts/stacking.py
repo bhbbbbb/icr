@@ -13,10 +13,11 @@ from icr.dataset import ICRDataset, ICRDatasetConfig
 from icr.classifier import ICRClassifier
 from icr.model_utils.ensemble import Ensemble
 
-from icr.tools import balanced_log_loss, seed_everything, precision_recall, color_precision_recall
+from icr.tools import balanced_log_loss, seed_everything, precision_recall, compare_with_color
 from icr.classifier.params import profiles as all_profile
 
-from model_utils.config import BaseConfig
+
+from icr.post_analysis import pred_analysis, post_analysis
 
 
 dataset_dir = os.path.realpath('icr-identify-age-related-conditions')
@@ -43,7 +44,15 @@ class Config(ICRDatasetConfig):
     inner_over_sampling_config: ICRDatasetConfig.OverSamplingConfig
     passthrough: bool
     model_save_dir: str
+    tabpfn_config: dict
+    prediction_analysis: bool = False
 
+
+def post_process(predictions: np.ndarray):
+    # over_positive = predictions > .95
+    # over_negative = predictions < .05
+    # predictions[(predictions > .65) & (predictions < .95)] = .95
+    return predictions.clip(min=.001)
 
 def inner_cv(
         train_subset: ICRDataset,
@@ -68,7 +77,13 @@ def inner_cv(
     for profile in config.inner_profiles:
         y_train = alpha_train if 'm' in profile else class_train
         y_valid = alpha_valid if 'm' in profile else class_valid
-        classifier = ICRClassifier(profile, cat_col_index, alpha_train, seed)
+        classifier = ICRClassifier(
+            profile,
+            seed,
+            cat_col_index=cat_col_index,
+            class_labels=class_train,
+            tab_config=config.tabpfn_config,
+        )
         classifier.fit(x_train, y_train, x_valid=x_valid, y_valid=y_valid)
 
         prediction = classifier.predict_proba(x_valid, no_reshape=('m' in profile))
@@ -92,8 +107,9 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
 
     # cv_log_dir = f'log/cv-{formatted_now()}'
     cv_loss = np.zeros(k)
-    best_loss = 100000.
-    best_modelss = None
+    cv_loss_post = np.zeros(k)
+    # best_loss = 100000.
+    # best_modelss = None
     ps = np.zeros(k)
     rs = np.zeros(k)
 
@@ -148,6 +164,7 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
         
         predictions = np.zeros(len(x_valid), dtype=np.float64)
 
+        stacking_models: typing.List[ICRClassifier] = []
         if config.stacking_profiles:
             # do stacking
             for profile in config.stacking_profiles:
@@ -155,8 +172,15 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
                 y_valid = alpha_valid if 'm' in profile else class_valid
 
                 cat_col = cat_col_index if config.passthrough else None
-                classifier = ICRClassifier(profile, cat_col, y_train, seed)
+                classifier = ICRClassifier(
+                    profile,
+                    seed,
+                    cat_col_index=cat_col,
+                    class_labels=class_train,
+                    tab_config=config.tabpfn_config,
+                )
                 classifier.fit(x_train, y_train, x_valid, y_valid)
+                stacking_models.append(classifier)
 
                 prediction = classifier.predict_proba(x_valid)
                 predictions += prediction
@@ -176,34 +200,42 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
 
             predictions /= len(config.inner_profiles)
 
-        # prediction[prediction < .2] = 0.
-        # prediction[prediction > .8] = 1.
-        eval_loss = balanced_log_loss(predictions, class_valid)
-        print(f'eval_loss = {eval_loss}')
-        if eval_loss < best_loss:
-            best_loss = eval_loss
-            best_modelss = modelss
+        raw_predictions = predictions.copy()
+        predictions = post_process(predictions)
+
+        eval_loss = balanced_log_loss(raw_predictions, class_valid)
+        eval_loss_post = balanced_log_loss(predictions, class_valid)
+
+        before_loss, after_loss = compare_with_color(eval_loss, eval_loss_post, reverse=True)
+        print(f'eval_loss (before, after) = ({before_loss}, {after_loss})')
         precision, recall, wrongs = precision_recall(predictions, class_valid)
-        precision_str, recall_str = color_precision_recall(precision, recall)
+        precision_str, recall_str = compare_with_color(precision, recall)
         print(f'precision: {precision_str}, recall: {recall_str}, wrongs: {wrongs}')
         cv_loss[fold] = eval_loss
+        cv_loss_post[fold] = eval_loss_post
         ps[fold] = precision
         rs[fold] = recall
 
-        if fold == k - 1:
-            model_save_dir = os.path.join(config.model_save_dir, f'seed-{hex(seed)}')
-            for f, models in enumerate(best_modelss):
-                save_dir = os.path.join(model_save_dir, f'fold-{f}')
-                os.makedirs(save_dir, exist_ok=True)
-                if config.stacking_profiles:
-                    classifier.save(save_dir, f'stack_{classifier.profile}')
-                for model in models:
-                    model.save(save_dir, model.profile)
+        if config.prediction_analysis:
+            # post_analysis(predictions, raw_predictions, class_valid, f'{seed}-{fold}')
+            pred_analysis(raw_predictions, class_valid, f'{seed}-{fold}')
 
-        
+        # if fold == k - 1:
+        model_save_dir =\
+            os.path.join(config.model_save_dir, f'seed-{hex(seed)}', f'f-{fold}')
+        os.makedirs(model_save_dir, exist_ok=True)
+        for stack_model in stacking_models:
+            stack_model.save(model_save_dir, f'stack_{stack_model.profile}')
+        for f, models in enumerate(modelss):
+            save_dir = os.path.join(model_save_dir, f'in-f-{f}')
+            os.makedirs(save_dir, exist_ok=True)
+            for model in models:
+                model.save(save_dir, model.profile)
     
-    print(f'cv_loss = {cv_loss.tolist()}')
+    # print(f'cv_loss = {cv_loss.tolist()}')
     print(f'cv_loss = {cv_loss.mean()}, {cv_loss.std()}')
+    # print(f'cv_loss = {cv_loss_post.tolist()}')
+    print(f'cv_loss_post = {cv_loss_post.mean()}, {cv_loss.std()}')
     return cv_loss, ps, rs
 
 
@@ -214,25 +246,34 @@ def main():
         test_csv_path=os.path.join(dataset_dir, 'test.csv'),
         greeks_csv_path=os.path.join(dataset_dir, 'greeks.csv'),
         model_save_dir=os.path.join(dataset_dir, 'models'),
+        tabpfn_config={'device': 'cuda:0', 'base_path': dataset_dir},
+        # tabpfn_config={'device': 'cpu', 'base_path': dataset_dir},
         over_sampling_config=Config.OverSamplingConfig(
             # sampling_strategy=.5,
-            sampling_strategy={0: 408, 1: 98, 2: 29, 3: 47},
+            # sampling_strategy={0: 408, 1: 98, 2: 29, 3: 47}, # k=5
+            sampling_strategy={0: 459, 1: 110, 2: 33, 3: 53}, # k = 10
             method='smote',
         ),
         inner_over_sampling_config=Config.OverSamplingConfig(
-            sampling_strategy={0: 327, 1: 79, 2: 24, 3: 38},
+            # sampling_strategy={0: 327, 1: 79, 2: 24, 3: 38}, # k = 5
+            sampling_strategy={0: 414, 1: 99, 2: 30, 3: 48}, # k = 10
             method='smote',
         ),
         labels='alpha',
         epsilon_as_feature=True,
-        inner_profiles=[profile for profile in all_profile.keys() if 'm' not in profile],
-        stacking_profiles=['lgb1'],
+        inner_profiles=[*(f'lgb{i}' for i in range(1, 4)), *(f'xgb{i}' for i in range(1, 4)), 'tab0', 'mtab1'],
+        # inner_profiles=['lgb2', 'xgb2', 'tab0', 'mtab1'],
+        # inner_profiles=['lgb1'],
+        # inner_profiles=[*(f'lgb{i}' for i in range(1, 5)), *(f'xgb{i}' for i in range(1, 6)), 'tab0', 'mtab1'],
+        # stacking_profiles=['lgb1'],
+        stacking_profiles=['lgb1', 'lgb2', 'lgb3', 'lgb4'],
         # passthrough=False,
         passthrough=True,
+        prediction_analysis=True,
     )
     config.display()
-    k = 5
-    s = 10
+    k = 10
+    s = 5
     seeds = [0xAAAAAA + i for i in range(s)]
     cv_loss = np.zeros((s, k))
     ps = np.zeros((s, k))

@@ -16,16 +16,18 @@ def balanced_log_loss(y_pred: np.ndarray, y_true: np.ndarray):
 def precision_recall(y_pred: np.ndarray, y_true: np.ndarray):
 
     mat = confusion_matrix(y_true, (y_pred > .5).astype(int))
-    tn, fp, fn, tp = mat.ravel()
+    _tn, fp, fn, tp = mat.ravel()
     precision = tp / (tp + fp)
     recall = tp / (tp + fn)
     wrongs = fp + fn
     return precision, recall, wrongs
 
-def color_precision_recall(precision, recall):
+def compare_with_color(precision: float, recall: float, reverse: bool = False):
     def get_color(my, other):
-        if my == 1.:
+        if my == 1. - float(reverse):
             return 'green'
+        if reverse:
+            return 'green' if my < other else 'red'
         return 'green' if my > other else 'red'
     precision_str = colored(f'{precision:.3f}', get_color(precision, recall))
     recall_str = colored(f'{recall:.3f}', get_color(recall, precision))

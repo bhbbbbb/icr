@@ -13,7 +13,8 @@ from icr.classifier import ICRClassifier
 from icr.model_utils.ensemble import Ensemble
 from termcolor import cprint
 
-from icr.tools import balanced_log_loss, seed_everything, color_precision_recall, precision_recall
+from icr.tools import balanced_log_loss, seed_everything, compare_with_color, precision_recall
+from icr.post_analysis import pred_analysis, post_analysis
 
 
 dataset_dir = os.path.realpath('icr-identify-age-related-conditions')
@@ -35,6 +36,8 @@ class Config(ICRDatasetConfig):
     # labels: typing.Literal['class', 'alpha'] = 'alpha'
     # standard_scale_enable: bool = False
     profiles: typing.Sequence[str]
+    tabpfn_config: dict
+    prediction_analysis: bool = False
 
 
 
@@ -68,20 +71,26 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
             y_train = alpha_train if 'm' in profile else class_train
             y_valid = alpha_valid if 'm' in profile else class_valid
 
-            classifier = ICRClassifier(profile, cat_col_index, y_train, seed)
+            classifier = ICRClassifier(
+                profile,
+                seed,
+                cat_col_index=cat_col_index,
+                class_labels=class_train,
+                tab_config=config.tabpfn_config,
+            )
             classifier.fit(x_train, y_train, x_valid, y_valid)
 
             prediction = classifier.predict_proba(x_valid)
             predictions += prediction
         
         predictions /= len(config.profiles)
-        # prediction = prediction.astype(np.float64)
-        # prediction[prediction < .2] = 0.
-        # prediction[prediction > .8] = 1.
+        predictions = predictions.clip(min=.01)
         eval_loss = balanced_log_loss(predictions, class_valid)
+        if config.prediction_analysis:
+            pred_analysis(predictions, class_valid, f'{seed}-{fold}')
         print(f'eval_loss = {eval_loss}')
         precision, recall, wrongs = precision_recall(predictions, class_valid)
-        precision_str, recall_str = color_precision_recall(precision, recall)
+        precision_str, recall_str = compare_with_color(precision, recall)
         print(f'precision: {precision_str}, recall: {recall_str}, wrongs: {wrongs}')
         cv_loss[fold] = eval_loss
         ps[fold] = precision
@@ -100,21 +109,24 @@ def main():
         train_csv_path=os.path.join(dataset_dir, 'train.csv'),
         test_csv_path=os.path.join(dataset_dir, 'test.csv'),
         greeks_csv_path=os.path.join(dataset_dir, 'greeks.csv'),
+        tabpfn_config={'device': 'cuda:0', 'base_path': dataset_dir},
         under_sampling_config=None,
         over_sampling_config=Config.OverSamplingConfig(
             # sampling_strategy=.5,
-            sampling_strategy={0: 408, 1: 98, 2: 29, 3: 47},
+            # sampling_strategy={0: 408, 1: 98, 2: 29, 3: 47}, # k = 5
+            sampling_strategy={0: 459, 1: 110, 2: 33, 3: 53}, # k = 10
             method='smote',
         ),
         labels='alpha',
         epsilon_as_feature=True,
         # xgb_profiles=[f'xgb{i}' for i in range(7)],
         # xgb_profile=['xgb1', 'xgb2', 'xgb3'],
-        profiles=['xgb6']
+        prediction_analysis=True,
+        profiles=['lgb1'],
     )
     config.display()
-    k = 5
-    s = 10
+    k = 10
+    s = 5
     seeds = [0xAAAAAA + i for i in range(s)]
     cv_loss = np.zeros((s, k))
     ps = np.zeros((s, k))
