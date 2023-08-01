@@ -13,7 +13,7 @@ def post_analysis(y_post: np.ndarray, y_pred: np.ndarray, y_true: np.ndarray, na
     pred_analysis(y_post, y_true, f'{name}_after')
     return
 
-def pred_analysis(y_pred: np.ndarray, y_true: np.ndarray, title: str):
+def pred_analysis(y_pred: np.ndarray, y_true: np.ndarray, title: str, out_dir: str = FIG_OUT_DIR):
     fig = _pred_analysis(y_pred, y_true)
     fig.savefig(os.path.join(FIG_OUT_DIR, f'{title}.png'))
     fig.clear()
@@ -71,16 +71,17 @@ def _draw(ax: plt.Axes, class_label, class_probs, all_loss, n_samples: int):
             small_losses += loss
             small_count += 1
     
-    small_unnorm_loss = small_losses * n_samples / small_count
     title = (
         ('zeros' if class_label == 0 else 'ones')
         #+ f' loss(p<.1): {100 * small_losses / all_loss:.1f}%, l={small_unnorm_loss:.3f}'
     )
     ax.set_title(title)
-    ax.annotate(
-        f'loss(p<.1): {100 * small_losses / all_loss:.1f}%,\nl={small_unnorm_loss:.3f}',
-        (.0 if class_label == 0 else .9, 1.05),
-    )
+    if small_count > 0:
+        small_unnorm_loss = small_losses * n_samples / small_count
+        ax.annotate(
+            f'loss(p<.1): {100 * small_losses / all_loss:.1f}%,\nl={small_unnorm_loss:.3f}',
+            (.0 if class_label == 0 else .9, 1.05),
+        )
     return
 
 # y_pred = np.random.random(10)
