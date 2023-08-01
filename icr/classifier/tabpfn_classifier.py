@@ -1,9 +1,10 @@
 from __future__ import annotations
 import os
 import pickle
+from typing import TypedDict
 
 from tabpfn import TabPFNClassifier
-from model_utils.base import BaseConfig
+# from model_utils.base import BaseConfig
 from .params import profiles
 from imblearn.over_sampling import RandomOverSampler
 import numpy as np
@@ -11,7 +12,7 @@ import numpy as np
 
 class ICRTabPFNClassifier:
 
-    class Config(BaseConfig):
+    class Config(TypedDict):
         device: str
         base_path: str
 
@@ -23,8 +24,7 @@ class ICRTabPFNClassifier:
         self.classifier = TabPFNClassifier(
             N_ensemble_configurations=profiles[profile],
             seed=seed,
-            device=config.device,
-            base_path=config.base_path,
+            **config
         )
         self.seed = seed
         self.profile = profile
