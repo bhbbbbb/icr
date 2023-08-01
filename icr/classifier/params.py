@@ -191,6 +191,9 @@ lgb_params4 = {
     'is_unbalance':True,
 } 
 
+tab_params0 = 24
+tab_params1 = 64
+
 xgb_profiles_list = [
     xgb_params0,
     xgb_params1,
@@ -207,20 +210,26 @@ lgb_profiles_list = [
     lgb_params3,
     lgb_params4,
 ]
+tab_profiles_list = [
+    tab_params0,
+    tab_params1,
+]
 
-xgb_multi_profile_list = [
+xgb_multi_profiles_list = [
     {**profile, 'objective': 'multi:softprob', 'eval_metric': 'mlogloss'}\
         for profile in xgb_profiles_list
 ]
 
-lgb_multi_profile_list = [
+lgb_multi_profiles_list = [
     {**profile, 'objective': 'multiclass'}\
         for profile in lgb_profiles_list
 ]
 
 profiles = {
     **{ f'xgb{idx}': params for idx, params in enumerate(xgb_profiles_list) },
-    **{ f'mxgb{idx}': params for idx, params in enumerate(xgb_multi_profile_list) },
+    **{ f'mxgb{idx}': params for idx, params in enumerate(xgb_multi_profiles_list) },
     **{ f'lgb{idx}': params for idx, params in enumerate(lgb_profiles_list) },
-    **{ f'mlgb{idx}': params for idx, params in enumerate(lgb_multi_profile_list) },
+    **{ f'mlgb{idx}': params for idx, params in enumerate(lgb_multi_profiles_list) },
+    **{ f'tab{idx}': params for idx, params in enumerate(tab_profiles_list) },
+    **{ f'mtab{idx}': params for idx, params in enumerate(tab_profiles_list) },
 }

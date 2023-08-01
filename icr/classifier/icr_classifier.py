@@ -6,6 +6,7 @@ import pickle
 # from .params import profiles
 from .xgb_classifier import ICRXGBClassifier
 from .lgb_classifier import ICRLGBClassifier
+from .tabpfn_classifier import ICRTabPFNClassifier
 # import numpy as np
 
 
@@ -14,9 +15,11 @@ class ICRClassifier:
     def __init__(
             self,
             profile: str,
+            seed: int,
+            *,
             cat_col_index: int,
             class_labels,
-            seed: int,
+            tab_config: dict,
             # **kwargs,
         ):
 
@@ -27,6 +30,12 @@ class ICRClassifier:
                 profile=profile,
             )
         
+        elif 'tab' in profile:
+            self.classifier = ICRTabPFNClassifier(
+                profile,
+                seed=seed,
+                config=ICRTabPFNClassifier.Config(**tab_config),
+            )
         else:
             assert 'lgb' in profile
             self.classifier = ICRLGBClassifier(
