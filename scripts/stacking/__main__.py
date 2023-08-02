@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from scripts.stacking import StackingConfig, train_inference
 
 def main():
@@ -15,27 +16,32 @@ def main():
             # sampling_strategy=.5,
             # sampling_strategy={0: 408, 1: 98, 2: 29, 3: 47}, # k=5
             # sampling_strategy={0: 459, 1: 110, 2: 33, 3: 53}, # k = 10
-            sampling_strategy={0: 1., 1: 2., 2: 3., 3: 2.}, # k = 10
+            sampling_strategy={0: 1., 1: 3., 2: 2.5, 3: 2.}, # k = 10
             method='smote',
         ),
         labels='alpha',
         epsilon_as_feature=True,
         # inner_profiles=[*(f'lgb{i}' for i in range(1, 4)), *(f'xgb{i}' for i in range(1, 4)), 'tab0', 'mtab1'],
         # inner_profiles=['lgb2', 'xgb2', 'tab0', 'mtab1'],
-        inner_profiles=['lgb1', 'xgb1', 'tab0'],
+        inner_profiles=['lgb1', 'xgb1'],
+        # inner_profiles=['lgb1'],
         # inner_profiles=[*(f'lgb{i}' for i in range(1, 5)), *(f'xgb{i}' for i in range(1, 6)), 'tab0', 'mtab1'],
-        stacking_profiles=['lgb1'],
+        stacking_profiles=['lgb3'],
         # stacking_profiles=['lgb1', 'lgb2', 'lgb3', 'lgb4'],
         # passthrough=False,
         passthrough=True,
         prediction_analysis=True,
         n_seeds=5,
-        inner_k=5,
+        inner_k=10,
         outer_k=10,
     )
     config.display()
 
-    pred = train_inference(config)
+    def submit_hook(pred: np.ndarray):
+        print(pred)
+        return
+
+    pred = train_inference(config, submit_hook)
     print(f'inference_pred: {pred}')
     return
 

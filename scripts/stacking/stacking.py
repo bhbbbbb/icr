@@ -2,6 +2,7 @@
 import os
 import warnings
 import typing
+from typing import Callable, Any
 
 from termcolor import cprint, colored
 from sklearn.model_selection import StratifiedKFold
@@ -149,10 +150,11 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
         yield eval_loss, infer_pred
 
 
-def train_inference(config: Config):
+def train_inference(config: Config, submit_hook: Callable[[np.ndarray], Any] = None):
 
     SEED_BASE = 0xAAAAAA
     cv_losses = np.zeros((config.n_seeds, config.outer_k), dtype=np.float64)
+    infer_prediction_set: typing.List[np.ndarray] = []
     seeds = [SEED_BASE + i for i in range(config.n_seeds)]
 
     def run_a_seed(seed: int):
@@ -174,6 +176,9 @@ def train_inference(config: Config):
                 yield infer_pred
         
         infer_prediction = ensemble_proba(run())
+        if submit_hook is not None:
+            infer_prediction_set.append(infer_prediction)
+            submit_hook(np.array(infer_prediction_set).mean(axis=0))
         return infer_prediction
 
     infer_prediction = ensemble_proba(run_a_seed(seed) for seed in seeds)
