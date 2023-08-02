@@ -41,7 +41,7 @@ class Config(ICRDatasetConfig):
     # standard_scale_enable: bool = False
     stacking_profiles: typing.Sequence[str]
     inner_profiles: typing.Sequence[str]
-    inner_over_sampling_config: ICRDatasetConfig.OverSamplingConfig
+    # inner_over_sampling_config: ICRDatasetConfig.OverSamplingConfig
     passthrough: bool
     model_save_dir: str
     tabpfn_config: dict
@@ -64,7 +64,7 @@ def inner_cv(
 
     assert config.labels == 'alpha'
     cat_col_index = train_subset.cat_column_locate
-    train_subset = train_subset.new_over_sampled_dataset(config.inner_over_sampling_config)
+    train_subset = train_subset.new_over_sampled_dataset()
     x_train, alpha_train = train_subset[:]
     x_valid, alpha_valid = valid_subset[:]
     x_test, _alpha_test = test_subset[:]
@@ -147,14 +147,14 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
 
 
         if config.passthrough:
-            train_subset.df = pd.concat(
-                [train_subset.df.reset_index(drop=True), train_predicted_df], axis=1)
-            valid_subset.df = pd.concat(
-                [valid_subset.df.reset_index(drop=True), valid_predicted_df], axis=1)
+            train_subset.train_df = pd.concat(
+                [train_subset.train_df.reset_index(drop=True), train_predicted_df], axis=1)
+            valid_subset.train_df = pd.concat(
+                [valid_subset.train_df.reset_index(drop=True), valid_predicted_df], axis=1)
             train_subset = train_subset.new_over_sampled_dataset()
         else:
-            train_subset.df = train_predicted_df
-            valid_subset.df = valid_predicted_df
+            train_subset.train_df = train_predicted_df
+            valid_subset.train_df = valid_predicted_df
         
         x_train, alpha_train = train_subset[:]
         x_valid, alpha_valid = valid_subset[:]
@@ -247,24 +247,26 @@ def main():
         greeks_csv_path=os.path.join(dataset_dir, 'greeks.csv'),
         model_save_dir=os.path.join(dataset_dir, 'models'),
         tabpfn_config={'device': 'cuda:0', 'base_path': dataset_dir},
+        # tabpfn_config={'device': 'cuda:0'},
         # tabpfn_config={'device': 'cpu', 'base_path': dataset_dir},
         over_sampling_config=Config.OverSamplingConfig(
             # sampling_strategy=.5,
             # sampling_strategy={0: 408, 1: 98, 2: 29, 3: 47}, # k=5
-            sampling_strategy={0: 459, 1: 110, 2: 33, 3: 53}, # k = 10
+            # sampling_strategy={0: 459, 1: 110, 2: 33, 3: 53}, # k = 10
+            sampling_strategy={0: 1., 1: 2., 2: 2., 3: 2.}, # k = 10
             method='smote',
         ),
-        inner_over_sampling_config=Config.OverSamplingConfig(
-            # sampling_strategy={0: 327, 1: 79, 2: 24, 3: 38}, # k = 5
-            sampling_strategy={0: 414, 1: 99, 2: 30, 3: 48}, # k = 10
-            method='smote',
-        ),
+        # inner_over_sampling_config=Config.OverSamplingConfig(
+        #     # sampling_strategy={0: 327, 1: 79, 2: 24, 3: 38}, # k = 5
+        #     sampling_strategy={0: 414, 1: 99, 2: 30, 3: 48}, # k = 10
+        #     method='smote',
+        # ),
         labels='alpha',
         epsilon_as_feature=True,
-        inner_profiles=[*(f'lgb{i}' for i in range(1, 4)), *(f'xgb{i}' for i in range(1, 4)), 'tab0', 'mtab1'],
+        # inner_profiles=[*(f'lgb{i}' for i in range(1, 4)), *(f'xgb{i}' for i in range(1, 4)), 'tab0', 'mtab1'],
         # inner_profiles=['lgb2', 'xgb2', 'tab0', 'mtab1'],
         # inner_profiles=['lgb1'],
-        # inner_profiles=[*(f'lgb{i}' for i in range(1, 5)), *(f'xgb{i}' for i in range(1, 6)), 'tab0', 'mtab1'],
+        inner_profiles=[*(f'lgb{i}' for i in range(1, 5)), *(f'xgb{i}' for i in range(1, 6)), 'tab0', 'mtab1'],
         # stacking_profiles=['lgb1'],
         stacking_profiles=['lgb1', 'lgb2', 'lgb3', 'lgb4'],
         # passthrough=False,

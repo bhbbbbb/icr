@@ -84,10 +84,9 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
             predictions += prediction
         
         predictions /= len(config.profiles)
-        predictions = predictions.clip(min=.01)
         eval_loss = balanced_log_loss(predictions, class_valid)
         if config.prediction_analysis:
-            pred_analysis(predictions, class_valid, f'{seed}-{fold}')
+            pred_analysis(predictions, class_valid, f'{hex(seed)}-{fold}')
         print(f'eval_loss = {eval_loss}')
         precision, recall, wrongs = precision_recall(predictions, class_valid)
         precision_str, recall_str = compare_with_color(precision, recall)
@@ -114,7 +113,8 @@ def main():
         over_sampling_config=Config.OverSamplingConfig(
             # sampling_strategy=.5,
             # sampling_strategy={0: 408, 1: 98, 2: 29, 3: 47}, # k = 5
-            sampling_strategy={0: 459, 1: 110, 2: 33, 3: 53}, # k = 10
+            # sampling_strategy={0: 459, 1: 110, 2: 33, 3: 53}, # k = 10
+            sampling_strategy={0: 1., 1: 2., 2: 2., 3: 2.}, # k = 10
             method='smote',
         ),
         labels='alpha',
@@ -122,7 +122,7 @@ def main():
         # xgb_profiles=[f'xgb{i}' for i in range(7)],
         # xgb_profile=['xgb1', 'xgb2', 'xgb3'],
         prediction_analysis=True,
-        profiles=['lgb1'],
+        profiles=['tab0'],
     )
     config.display()
     k = 10

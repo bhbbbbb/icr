@@ -1,7 +1,9 @@
-from typing import Tuple, Optional, Literal, Union
+from typing import Tuple, Optional, Literal, Union, Dict
+
+import numpy as np
 
 from model_utils.config import BaseConfig
-from pydantic import model_validator
+from pydantic import model_validator, field_validator
 
 class ICRDatasetConfig(BaseConfig):
 
@@ -32,9 +34,33 @@ class ICRDatasetConfig(BaseConfig):
 
     class OverSamplingConfig(BaseConfig):
 
-        sampling_strategy: Union[float, dict, Literal['auto']] = 1.
+        sampling_strategy: Union[float, Literal['auto'], Dict[int, int], Dict[int, float]]
+        """
+            when type is float, Dict[int, int], Literal['auto'], the behavior would be the same
+            as described in imbalearn documents.
+
+            When type is Dict[int, float], the float-type value would be the increasing ratio of 
+            unsampling data corresponding to classes.
+            E.g. {0: 1., 1: 2., 2: 2., 3: 2.}, the class0 samples would not be over-sampled,
+            other classes samples would be doublely over-sampled.
+
+        """
 
         method: Literal['smote', 'random']
+
+        @field_validator('sampling_strategy', mode='before')
+        @classmethod
+        def check_sampling_strategy(cls, value):
+
+            if not isinstance(value, dict):
+                return value
+
+            counts = np.unique([str(type(v)) for v in value.values()])
+            assert len(counts) == 1, (
+                'expect all of the type of values be one of "int" or "float"'
+                f', but more than two types were found: {counts}'
+            )
+            return value
 
     # over_sampling_strategy: Optional[Union[float, dict]] = None
 

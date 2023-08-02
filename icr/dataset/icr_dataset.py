@@ -1,6 +1,8 @@
 from __future__ import annotations
 # import os
+# import math
 from datetime import datetime
+import warnings
 from typing import (
     Literal, get_args, Tuple, ClassVar, Sequence, Union, overload
 )
@@ -19,6 +21,7 @@ ModeT = Literal['train', 'valid', 'infer']
 CAT_COL = 'EJ'
 CLASS_COL = 'Class'
 EPSILON_COL = 'Epsilon'
+
 
 class ICRDataset(Dataset):
     """ICR Dataset
@@ -46,7 +49,7 @@ class ICRDataset(Dataset):
         self.config = config
         self.mode = mode
         
-        self.df, self.class_ser, self.alpha_ser, self.test_df = ICRDataset._load_df(
+        self.train_df, self.class_ser, self.alpha_ser, self.test_df = ICRDataset._load_df(
             config.train_csv_path,
             config.greeks_csv_path,
             config.test_csv_path,
@@ -55,29 +58,16 @@ class ICRDataset(Dataset):
         )
         
 
-        self.over_sampler = self._load_over_sampler(
-            config.over_sampling_config,
-            self.df.columns.get_loc(CAT_COL),
-        )
+        # self.over_sampler = self._load_over_sampler(
+        #     config.over_sampling_config,
+        #     self.df.columns.get_loc(CAT_COL),
+        # )
         return
 
     @property
     def cat_column_locate(self):
-        return self.df.columns.get_loc(CAT_COL)
+        return self.train_df.columns.get_loc(CAT_COL)
 
-    @classmethod
-    def _load_over_sampler(
-        cls,
-        os_config: ICRDatasetConfig.OverSamplingConfig,
-        cat_col_idx: int,
-    ):
-
-        assert os_config.method in ['smote', 'random']
-        
-        if os_config.method == 'smote':
-            return SMOTENC([cat_col_idx], sampling_strategy=os_config.sampling_strategy)
-
-        return RandomOverSampler(sampling_strategy=os_config.sampling_strategy)
 
 
     @classmethod
@@ -120,17 +110,31 @@ class ICRDataset(Dataset):
 
         
         imputer = SimpleImputer(strategy='median')
-        train_df.iloc[:, :] = imputer.fit_transform(train_df)
-        test_df.iloc[:, :] = imputer.transform(test_df)
 
-        if standard_scale_enable:
-            scaler = StandardScaler()
-            train_cat_col = train_df[CAT_COL].copy()
-            test_cat_col = test_df[CAT_COL].copy()
-            train_df.iloc[:, :] = scaler.fit_transform(train_df)
-            test_df.iloc[:, :] = scaler.transform(test_df)
-            train_df[CAT_COL] = train_cat_col
-            test_df[CAT_COL] = test_cat_col
+        with warnings.catch_warnings():
+            # Setting values in-place is fine, ignore the warning in Pandas >= 1.5.0
+            # This can be removed, if Pandas 1.5.0 does not need to be supported any longer.
+            # See also: https://stackoverflow.com/q/74057367/859591
+            warnings.filterwarnings(
+                "ignore",
+                # category=DeprecationWarning,
+                message=(
+                    '.*will attempt to set the values inplace instead of always '
+                    'setting a new array. '
+                    'To retain the old behavior, use either.*'
+                ),
+            )
+            train_df.iloc[:, :] = imputer.fit_transform(train_df)
+            test_df.iloc[:, :] = imputer.transform(test_df)
+
+            if standard_scale_enable:
+                scaler = StandardScaler()
+                train_cat_col = train_df[CAT_COL].copy()
+                test_cat_col = test_df[CAT_COL].copy()
+                train_df.iloc[:, :] = scaler.fit_transform(train_df)
+                test_df.iloc[:, :] = scaler.transform(test_df)
+                train_df[CAT_COL] = train_cat_col
+                test_df[CAT_COL] = test_cat_col
         
         return train_df, class_df, alpha_df, test_df
 
@@ -195,16 +199,35 @@ class ICRDataset(Dataset):
                             shuffle=True)
 
     def new_over_sampled_dataset(
-            self,
-            over_sample_config: ICRDatasetConfig.OverSamplingConfig = None,
-        ) -> OverSampledDataset:
+        self,
+    ) -> OverSampledDataset:
         assert self.mode == 'train'
+
+        os_config = self.config.over_sampling_config
+        assert os_config.method in ['smote', 'random']
+
+        sampling_strategy = os_config.sampling_strategy
+
+        if isinstance(sampling_strategy, dict):
+            assert self.config.labels == 'alpha'
+            sampling_strategy = os_config.sampling_strategy.copy()
+
+            if isinstance(next(iter(sampling_strategy.values())), float):
+                for k, v in sampling_strategy.items():
+                    bins = self.alpha_ser.value_counts()
+                    sampling_strategy[k] = int(bins[k] * v)
+
         sampler = (
-            self.over_sampler
-            if over_sample_config is None else
-            self._load_over_sampler(over_sample_config, self.df.columns.get_loc(CAT_COL))
+            SMOTENC(
+                [self.cat_column_locate],
+                sampling_strategy=sampling_strategy,
+            )
+            if os_config.method == 'smote' else
+            RandomOverSampler(sampling_strategy=sampling_strategy)
         )
+
         x, y = sampler.fit_resample(*(self[:]))
+
         return OverSampledDataset(x, y)
     
     def make_subset(self, indices: list, mode: ModeT) -> ICRDataset:
@@ -222,13 +245,13 @@ class ICRDataset(Dataset):
         assert mode in get_args(ModeT)
         subset = ICRDataset('train', self.config)
         subset.mode = mode
-        subset.df = self.df.iloc[indices]
+        subset.train_df = self.train_df.iloc[indices]
         subset.class_ser = self.class_ser.iloc[indices]
         subset.alpha_ser = self.alpha_ser.iloc[indices]
         return subset
 
     def __len__(self):
-        return len(self.df) if self.mode != 'infer' else len(self.test_df)
+        return len(self.train_df) if self.mode != 'infer' else len(self.test_df)
 
     
     @overload
@@ -264,7 +287,7 @@ class ICRDataset(Dataset):
         if self.mode == 'infer':
             return self.test_df.iloc[index].to_numpy()
 
-        features = self.df.iloc[index]
+        features = self.train_df.iloc[index]
         labels = (
             self.class_ser[index]
             if self.config.labels == 'class' else
