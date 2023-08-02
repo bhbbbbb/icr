@@ -1,7 +1,8 @@
 from __future__ import annotations
-import os
 from typing import overload
-import pickle
+from typing_extensions import Self
+# import os
+# import pickle
 
 # from .params import profiles
 from .xgb_classifier import ICRXGBClassifier
@@ -55,10 +56,11 @@ class ICRClassifier:
     #     return 1.
 
     @overload
-    def fit(self, x_train, y_train, x_valid, y_valid):...
+    def fit(self, x_train, y_train, x_valid, y_valid) -> Self:...
 
     def fit(self, x, y, x_valid = None, y_valid = None):
-        return self.classifier.fit(x, y, x_valid, y_valid)
+        self.classifier.fit(x, y, x_valid, y_valid)
+        return self
 
     def predict_proba(self, x, no_reshape: bool = False, **_kwargs):
         """_summary_
@@ -75,13 +77,13 @@ class ICRClassifier:
     def set_params(self, **params):
         return self.classifier.set_params(**params)
 
-    def save(self, save_dir: str, name: str):
-        with open(os.path.join(save_dir, f'{name}.pkl'), mode='wb') as fout:
-            pickle.dump(self, fout)
-        return
+    # def save(self, save_dir: str, name: str):
+    #     with open(os.path.join(save_dir, f'{name}.pkl'), mode='wb') as fout:
+    #         pickle.dump(self, fout)
+    #     return
         
-    @classmethod
-    def load_classifer(cls, load_dir: str, name: str) -> ICRClassifier:
-        with open(os.path.join(load_dir, name), mode='rb') as fin:
-            classifier = pickle.load(fin)
-        return classifier
+    # @classmethod
+    # def load_classifer(cls, load_dir: str, name: str) -> ICRClassifier:
+    #     with open(os.path.join(load_dir, name), mode='rb') as fin:
+    #         classifier = pickle.load(fin)
+    #     return classifier

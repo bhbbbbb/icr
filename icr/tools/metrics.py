@@ -1,11 +1,6 @@
-import os
 import numpy as np
 from sklearn.metrics import log_loss, confusion_matrix
 from termcolor import colored
-
-def is_on_kaggle():
-    """determine whether the environment is on kaggle."""
-    return os.environ.get('KAGGLE_KERNEL_RUN_TYPE') is not None
 
 def balanced_log_loss(y_pred: np.ndarray, y_true: np.ndarray):
 
@@ -32,13 +27,3 @@ def compare_with_color(precision: float, recall: float, reverse: bool = False):
     precision_str = colored(f'{precision:.3f}', get_color(precision, recall))
     recall_str = colored(f'{recall:.3f}', get_color(recall, precision))
     return precision_str, recall_str
-
-def seed_everything(seed=42):
-    import random
-    import torch
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True

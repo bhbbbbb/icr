@@ -10,12 +10,11 @@ import numpy as np
 from icr.dataset import ICRDataset, ICRDatasetConfig
 # from icr.classifier import ICRXGBClassfier
 from icr.classifier import ICRClassifier
-from icr.model_utils.ensemble import Ensemble
 from termcolor import cprint
 
-from icr.tools import balanced_log_loss, seed_everything, compare_with_color, precision_recall
+from icr.tools import seed_everything
+from icr.tools.metrics import balanced_log_loss, compare_with_color, precision_recall
 from icr.post_analysis import pred_analysis, post_analysis
-
 
 dataset_dir = os.path.realpath('icr-identify-age-related-conditions')
 class Config(ICRDatasetConfig):

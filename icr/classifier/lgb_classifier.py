@@ -51,7 +51,7 @@ class ICRLGBClassifier:
 
         assert x_valid is not None and y_valid is not None
         self._fit(x, y, x_valid, y_valid)
-        return
+        return self
 
     def _fit(self, x_train, y_train, x_valid, y_valid):
         self.classifier.fit(

@@ -1,2 +1,2 @@
-# from .xgb_classifier import ICRXGBClassfier
 from .icr_classifier import ICRClassifier
+from .icr_ensemble_classifier import ICREnsembleClassifier
