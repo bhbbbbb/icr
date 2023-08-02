@@ -32,14 +32,20 @@ class ICRTabPFNClassifier:
     
     def fit(self, x_train, y_train, _x_valid, _y_valid):
 
-        labels = np.unique(y_train)
-        zeros_count = (y_train == 0).sum()
-        ones_count = int(zeros_count / (len(labels) - 1))
+        def get_counts():
+            labels = np.unique(y_train)
+            for label in labels:
+                if label != 0:
+                    yield label, (y_train == label).sum() * 2
+                else:
+                    yield label, (y_train == label).sum()
+
+        sampling_strategy = dict(get_counts())
+        if sampling_strategy[1] > sampling_strategy[0]:
+            sampling_strategy[1] = sampling_strategy[0]
+
         over_sampler = RandomOverSampler(
-            sampling_strategy={
-                **{label: ones_count for label in labels},
-                0: zeros_count,
-            },
+            sampling_strategy=sampling_strategy,
             random_state=self.seed,
         )
         x_train, y_train = over_sampler.fit_resample(x_train, y_train)
