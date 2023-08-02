@@ -3,25 +3,31 @@ import math
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.metrics import log_loss
-# from icr.tools import balanced_log_loss
+from icr.tools import alpha_to_class
 
 FIG_OUT_DIR = os.path.join('log', 'figures')
 os.makedirs(FIG_OUT_DIR, exist_ok=True)
 
-def post_analysis(y_post: np.ndarray, y_pred: np.ndarray, y_true: np.ndarray, name: str):
-    pred_analysis(y_pred, y_true, f'{name}_before')
-    pred_analysis(y_post, y_true, f'{name}_after')
-    return
+# def post_analysis(y_post: np.ndarray, y_pred: np.ndarray, y_true: np.ndarray, name: str):
+#     pred_analysis(y_pred, y_true, f'{name}_before')
+#     pred_analysis(y_post, y_true, f'{name}_after')
+#     return
 
-def pred_analysis(y_pred: np.ndarray, y_true: np.ndarray, title: str, out_dir: str = FIG_OUT_DIR):
-    fig = _pred_analysis(y_pred, y_true)
-    fig.savefig(os.path.join(FIG_OUT_DIR, f'{title}.png'))
+def pred_analysis(
+        y_pred: np.ndarray,
+        alpha_true: np.ndarray,
+        title: str,
+        out_dir: str = FIG_OUT_DIR
+    ):
+    fig = _pred_analysis(y_pred, alpha_true)
+    fig.savefig(os.path.join(out_dir, f'{title}.png'))
     fig.clear()
     fig.clf()
     plt.close(fig)
     return
 
-def _pred_analysis(y_pred: np.ndarray, y_true: np.ndarray):
+def _pred_analysis(y_pred: np.ndarray, alpha_true: np.ndarray):
+    y_true = alpha_to_class(alpha_true)
     ones = y_pred[y_true == 1]
     zeros = y_pred[y_true == 0]
     # class_weights = 1 / np.array([(y_true == 0).sum(), (y_true == 1).sum()])
@@ -39,20 +45,34 @@ def _pred_analysis(y_pred: np.ndarray, y_true: np.ndarray):
         f'ones: {100 * ones_loss / all_loss: .1f}%'
     )
     _draw(axs[0], 0, zeros, all_loss, len(y_true))
-    _draw(axs[1], 1, ones, all_loss, len(y_true))
+    _draw(axs[1], 1, ones, all_loss, len(y_true), alpha_true[y_true == 1])
     return fig
 
-def _draw(ax: plt.Axes, class_label, class_probs, all_loss, n_samples: int):
+def _draw(
+        ax: plt.Axes,
+        class_label,
+        class_probs,
+        all_loss,
+        n_samples: int,
+        alpha_labels: np.ndarray = None,
+    ):
 
     scatter = np.linspace(0, 1, len(class_probs))
-    # class_probs = 1 - class_probs if class_label == 1 else class_probs
-    # scatter = [random.random() for _ in class_probs]
 
     # ax.set_xscale('log')
     # ax.set_xlim(1e-15, 1e-0)
     ax.set_xlim(0, 1)
-    # ax.set_xlim(xmax=1e-0)
-    ax.scatter(class_probs, scatter, s=15, color=('blue' if class_label == 0 else 'red'))
+    if class_label == 0:
+        ax.scatter(class_probs, scatter, s=15, color='blue')
+    else:
+        assert alpha_labels is not None
+        alphas = ['B', 'D', 'G']
+        colors = ['red', 'green', 'cyan']
+        for i, color, alpha in zip(range(1, 4), colors, alphas):
+            indices = alpha_labels == i
+            ax.scatter(class_probs[indices], scatter[indices], s=15, color=color, label=alpha)
+        ax.legend()
+
     w = .5 / len(class_probs)
     small_losses = 0.
     small_count = 0

@@ -11,7 +11,6 @@ import pandas as pd
 
 from icr.dataset import ICRDataset, ICRDatasetConfig
 from icr.classifier import ICRClassifier, ICREnsembleClassifier
-from icr.model_utils.ensemble import Ensemble
 
 from icr.tools import seed_everything, is_on_kaggle, alpha_to_class
 from icr.tools.metrics import balanced_log_loss, precision_recall, compare_with_color
@@ -152,34 +151,32 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
 
 def train_inference(config: Config):
 
+    SEED_BASE = 0xAAAAAA
+    cv_losses = np.zeros((config.n_seeds, config.outer_k), dtype=np.float64)
+    seeds = [SEED_BASE + i for i in range(config.n_seeds)]
+
     def run_a_seed(seed: int):
 
-        cv_loss = np.zeros(config.outer_k)
+        # cv_loss = np.zeros(config.outer_k)
 
         cv = cross_validation(config.outer_k, config, seed)
 
         def run():
             for fold, (eval_loss, infer_pred) in enumerate(cv):
-                cv_loss[fold] = eval_loss
+                # cv_loss[fold] = eval_loss
+                sidx = seed - SEED_BASE
+                cv_losses[sidx, fold] = eval_loss
+                acc_loss = cv_losses.flatten()[:sidx * config.n_seeds + fold + 1]
                 print(
-                    f'cv_loss[fold:{fold}-seed:{hex(seed)}] = '
-                    f'{cv_loss.mean():.4f}, {cv_loss.std():.4f}'
+                    f'eval_loss[fold:{fold}-seed:{hex(seed)}] = {eval_loss:.4f}\n'
+                    f'accmulated_cv_loss = {acc_loss.mean():.4f}, {acc_loss.std():.4f}'
                 )
                 yield infer_pred
         
         infer_prediction = ensemble_proba(run())
-        return cv_loss, infer_prediction
+        return infer_prediction
 
-    cv_losses = np.zeros((config.n_seeds, config.outer_k), dtype=np.float64)
-    seeds = [0xAAAAAA + i for i in range(config.n_seeds)]
-
-    def run_all_seeds():
-        for idx, seed in enumerate(seeds):
-            cv_loss, infer_pred = run_a_seed(seed)
-            cv_losses[idx] = cv_loss
-            yield infer_pred
-    
-    infer_prediction = ensemble_proba(run_all_seeds())
+    infer_prediction = ensemble_proba(run_a_seed(seed) for seed in seeds)
 
     print('-' * 60)
     print(f'cv_losses = {cv_losses.tolist()}')

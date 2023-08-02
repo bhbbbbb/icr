@@ -213,8 +213,8 @@ class ICRDataset(Dataset):
             sampling_strategy = os_config.sampling_strategy.copy()
 
             if isinstance(next(iter(sampling_strategy.values())), float):
+                bins = self.alpha_ser.value_counts()
                 for k, v in sampling_strategy.items():
-                    bins = self.alpha_ser.value_counts()
                     sampling_strategy[k] = int(bins[k] * v)
 
         sampler = (

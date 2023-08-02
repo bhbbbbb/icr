@@ -14,7 +14,7 @@ from termcolor import cprint
 
 from icr.tools import seed_everything
 from icr.tools.metrics import balanced_log_loss, compare_with_color, precision_recall
-from icr.post_analysis import pred_analysis, post_analysis
+from icr.post_analysis import pred_analysis #, post_analysis
 
 dataset_dir = os.path.realpath('icr-identify-age-related-conditions')
 class Config(ICRDatasetConfig):
@@ -85,7 +85,7 @@ def cross_validation(k: int, config: Config, seed: int = 0xAAAA):
         predictions /= len(config.profiles)
         eval_loss = balanced_log_loss(predictions, class_valid)
         if config.prediction_analysis:
-            pred_analysis(predictions, class_valid, f'{hex(seed)}-{fold}')
+            pred_analysis(predictions, alpha_valid, f'{hex(seed)}-{fold}')
         print(f'eval_loss = {eval_loss}')
         precision, recall, wrongs = precision_recall(predictions, class_valid)
         precision_str, recall_str = compare_with_color(precision, recall)
@@ -113,7 +113,7 @@ def main():
             # sampling_strategy=.5,
             # sampling_strategy={0: 408, 1: 98, 2: 29, 3: 47}, # k = 5
             # sampling_strategy={0: 459, 1: 110, 2: 33, 3: 53}, # k = 10
-            sampling_strategy={0: 1., 1: 2., 2: 2., 3: 2.}, # k = 10
+            sampling_strategy={0: 1., 1: 3., 2: 2., 3: 2.}, # k = 10
             method='smote',
         ),
         labels='alpha',
@@ -121,7 +121,7 @@ def main():
         # xgb_profiles=[f'xgb{i}' for i in range(7)],
         # xgb_profile=['xgb1', 'xgb2', 'xgb3'],
         prediction_analysis=True,
-        profiles=['tab0'],
+        profiles=['lgb1'],
     )
     config.display()
     k = 10
